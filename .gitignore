@@ -43,4 +43,4 @@ vector_db/
 
 # Temporary files
 *.tmp
-*.temp
+*.tempchroma/
