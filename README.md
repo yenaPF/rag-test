@@ -1,3 +1,78 @@
+# Setting
+
+### 1. 환경 설정
+
+이 단계에서는 Node.js 개발을 위한 기본적인 환경을 세팅하고, RAG 벡터 DB 구축에 필요한 핵심 라이브러리들을 설치합니다.
+
+#### 1.1.1 프로젝트 초기화 및 Node.js 환경 설정
+
+먼저 새로운 Node.js 프로젝트 폴더를 만들고 초기화합니다.
+
+```bash
+# 새 프로젝트 폴더 생성 및 이동
+mkdir my-rag-schema-db
+cd my-rag-schema-db
+
+# Node.js 프로젝트 초기화 (package.json 파일 생성)
+npm init -y
+```
+
+#### 1.1.2 필요한 라이브러리 설치
+
+LangChain.js와 임베딩 모델, 벡터 저장소, 그리고 데이터베이스 연결을 위한 라이브러리들을 설치합니다.
+
+* **LangChain.js 코어 라이브러리:**
+    * `@langchain/core`: LangChain의 핵심 컴포넌트들을 제공합니다.
+    * `@langchain/community`: LangChain 커뮤니티에서 제공하는 추가적인 통합 기능들 (예: 다양한 임베딩 모델, 벡터 저장소)을 포함합니다.
+
+    ```bash
+    npm install @langchain/core @langchain/community
+    ```
+
+* **임베딩 모델 라이브러리:**
+    * **`@langchain/community`:** 이 패키지 안에 `OllamaEmbeddings`나 `HuggingFaceEmbeddings` 등 다양한 임베딩 모델 통합이 포함되어 있습니다. 별도로 설치할 필요 없이 `@langchain/community` 설치로 충분합니다.
+    * **OpenAI Embeddings (선택 사항):** 만약 OpenAI의 임베딩 모델(`text-embedding-ada-002`, `text-embedding-3-small` 등)을 사용하고 싶다면 추가로 `@langchain/openai`를 설치하고 API 키를 설정해야 합니다.
+
+    ```bash
+    # OpenAI Embeddings를 사용할 경우 추가 설치
+    npm install @langchain/openai
+    ```
+
+* **벡터 저장소 라이브러리:**
+    * **ChromaDB:** 로컬 파일 시스템에 데이터를 저장할 수 있는 경량 벡터 DB입니다. `chromadb` 패키지를 사용합니다.
+    * **FAISS (Node.js용):** FAISS는 주로 Python에서 사용되지만, Node.js 환경에서 FAISS를 직접 사용하는 것은 복잡합니다. 일반적으로 ChromaDB와 같은 순수 JavaScript/TypeScript 기반의 벡터 DB나, FAISS 서버를 별도로 구축하고 API로 연동하는 방식을 고려해야 합니다. 여기서는 **ChromaDB를 기본으로 추천**합니다.
+
+    ```bash
+    # ChromaDB 설치 (가장 추천하는 로컬 벡터 DB)
+    npm install chromadb
+    # LangChain과 ChromaDB 연동을 위한 패키지
+    npm install @langchain/community
+    ```
+
+* **데이터베이스 연결 라이브러리:**
+    * 사용하려는 데이터베이스 종류에 맞춰 설치합니다.
+        * **PostgreSQL:** `pg` (Node.js용 PostgreSQL 클라이언트)
+        * **MySQL:** `mysql2` (Node.js용 MySQL 클라이언트)
+        * **SQLite:** `sqlite3` (Node.js용 SQLite 클라이언트)
+
+    ```bash
+    # 예시: PostgreSQL을 사용할 경우
+    npm install pg
+
+    # 예시: MySQL을 사용할 경우
+    # npm install mysql2
+
+    # 예시: SQLite를 사용할 경우
+    # npm install sqlite3
+    ```
+
+* **환경 변수 관리 라이브러리:**
+    * `.env` 파일에 환경 변수를 저장하고 불러오기 위해 `dotenv`를 설치합니다.
+
+    ```bash
+    npm install dotenv
+    ```
+
 # RAG 벡터 DB 검색 시스템 개발 프로젝트
 
 ## 프로젝트 개요
