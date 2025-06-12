@@ -47,6 +47,8 @@ LangChain.js와 임베딩 모델, 벡터 저장소, 그리고 데이터베이스
     npm install chromadb
     # LangChain과 ChromaDB 연동을 위한 패키지
     npm install @langchain/community
+    pip install chromadb
+    chroma run --host localhost --port 8000 (chromadb 실행 시)
     ```
 
 * **데이터베이스 연결 라이브러리:**
