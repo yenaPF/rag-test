@@ -153,7 +153,7 @@ DB_USER=root
 DB_PASSWORD=rootpassword
 DB_NAME=shopping_mall
 OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=nomic-embed-text
+OLLAMA_MODEL=Llama3.2
 ```
 
 ### 2. 벡터 DB 구축
@@ -205,7 +205,7 @@ Claude Desktop 설정 파일 (`~/Library/Application Support/Claude/claude_deskt
 ## 발견된 문제점
 
 ### 1. 임베딩 모델 품질 이슈
-**문제**: Ollama 로컬 임베딩 모델(`nomic-embed-text`)의 한국어 성능 한계
+**문제**: Ollama 로컬 임베딩 모델(`llama3.2`)의 한국어 성능 한계
 - "아이폰" 검색 시 `products` 테이블이 최상위 결과로 나오지 않음
 - 한국어 ↔ 영어 연관성 인식 부족 ("아이폰" vs "iPhone")
 - 의미적 유사도 계산 정확도 낮음
