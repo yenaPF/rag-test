@@ -48,7 +48,6 @@ LangChain.js와 임베딩 모델, 벡터 저장소, 그리고 데이터베이스
     # LangChain과 ChromaDB 연동을 위한 패키지
     npm install @langchain/community
     pip install chromadb
-    chroma run --host localhost --port 8000 (chromadb 실행 시)
     ```
 
 * **데이터베이스 연결 라이브러리:**
@@ -59,10 +58,10 @@ LangChain.js와 임베딩 모델, 벡터 저장소, 그리고 데이터베이스
 
     ```bash
     # 예시: PostgreSQL을 사용할 경우
-    npm install pg
+    # npm install pg
 
     # 예시: MySQL을 사용할 경우
-    # npm install mysql2
+    npm install mysql2
 
     # 예시: SQLite를 사용할 경우
     # npm install sqlite3
@@ -159,6 +158,7 @@ OLLAMA_MODEL=nomic-embed-text
 
 ### 2. 벡터 DB 구축
 ```bash
+chroma run --host localhost --port 8000 (chromadb 실행 시)
 npm run build-db
 ```
 
@@ -191,7 +191,6 @@ Claude Desktop 설정 파일 (`~/Library/Application Support/Claude/claude_deskt
 - ✅ MySQL 스키마 추출 및 벡터화 완료
 - ✅ ChromaDB에 스키마 정보 저장 성공
 - ✅ 자연어 검색 기능 동작 확인
-- ✅ MCP 서버 Claude Desktop 연동 성공
 - ✅ 벡터 검색 결과 반환 확인
 
 ### 벡터 검색 결과 예시
