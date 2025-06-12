@@ -1,20 +1,23 @@
 {
   "name": "rag-test",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "RAG Vector Search MCP Server",
+  "main": "mcp-server.js",
   "scripts": {
     "start": "node index.js",
-    "build-db": "node scripts/buildVectorDb.js"
+    "build-db": "node scripts/build_vector_db.js",
+    "mcp-server": "node mcp-server.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@langchain/community": "^0.0.60",
-    "@langchain/core": "^0.2.14",
-    "chromadb": "^1.8.1",
+    "@langchain/community": "^0.3.19",
+    "@langchain/core": "^0.3.26",
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "chromadb": "^1.10.5",
     "dotenv": "^16.4.5",
-    "pg": "^8.12.0"
+    "langchain": "^0.3.8",
+    "mysql2": "^3.11.4"
   }
 }

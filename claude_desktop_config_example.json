@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "rag-vector-search": {
+      "command": "node",
+      "args": ["/Users/pyn/Documents/GitHub/rag-test/mcp-server.js"],
+      "env": {
+        "NODE_PATH": "/Users/pyn/Documents/GitHub/rag-test/node_modules"
+      }
+    }
+  }
+}

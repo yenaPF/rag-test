@@ -26,33 +26,32 @@ async function buildVectorDb() {
     // 만약 더 긴 청크가 필요하다면, 이 단계에서 RecursiveCharacterTextSplitter를 사용하여
     // documents를 한 번 더 처리할 수 있습니다.
     const documents = await formatSchemaAsDocuments();
-    console(`총 ${documents.length}개의 스키마 Document 준비 완료.`);
+    console.log(`총 ${documents.length}개의 스키마 Document 준비 완료.`);
 
     // ChromaDB가 저장될 로컬 경로 정의
     const collectionName = 'schema_documents'; // ChromaDB 컬렉션 이름
     const chromaDbPath = './chroma_db'; // 벡터 DB가 저장될 로컬 폴더
 
     // 5.1.2 벡터 저장소 초기화 및 5.1.3 청크 벡터 변환 및 저장
-    console(`벡터 DB 초기화 및 Document 저장 시작: ${chromaDbPath}/${collectionName}`);
+    console.log(`벡터 DB 초기화 및 Document 저장 시작: ${chromaDbPath}/${collectionName}`);
     try {
         const vectorStore = await Chroma.fromDocuments(documents, embeddings, {
             collectionName: collectionName,
-            url: chromaDbPath, // 로컬 파일 시스템에 저장할 경로 (ChromaDB의 경우 `url` 옵션 사용)
         });
-        console('벡터 DB에 Document 및 벡터 저장 완료!');
-        console(`ChromaDB가 ${chromaDbPath} 경로에 저장되었습니다.`);
+        console.log('벡터 DB에 Document 및 벡터 저장 완료!');
+        console.log(`ChromaDB가 ${chromaDbPath} 경로에 저장되었습니다.`);
 
         // 6.1.1 벡터 DB 데이터 무결성 확인 (간단한 테스트)
-        console('\n--- 6.1.1 벡터 DB 데이터 무결성 확인 (간단한 테스트) ---');
+        console.log('\n--- 6.1.1 벡터 DB 데이터 무결성 확인 (간단한 테스트) ---');
         const testQuery = "사용자 정보에 대한 테이블을 찾아줘";
-        console(`테스트 쿼리: "${testQuery}"`);
+        console.log(`테스트 쿼리: "${testQuery}"`);
         const results = await vectorStore.similaritySearch(testQuery, 1); // 가장 유사한 문서 1개 검색
 
         if (results.length > 0) {
-            console('검색 결과:', results[0].metadata.tableName); // 검색된 테이블 이름
+            console.log('검색 결과:', results[0].metadata.tableName); // 검색된 테이블 이름
             // console.log('검색된 문서 내용의 일부:', results[0].pageContent.substring(0, 200) + '...');
         } else {
-            console('검색 결과가 없습니다. 벡터 DB 구축에 문제가 있을 수 있습니다.');
+            console.log('검색 결과가 없습니다. 벡터 DB 구축에 문제가 있을 수 있습니다.');
         }
 
     } catch (error) {
@@ -60,7 +59,7 @@ async function buildVectorDb() {
         throw error;
     } finally {
         await closeDbPool(); // 데이터베이스 풀 종료
-        console('\n--- 벡터 DB 구축 프로세스 완료 ---');
+        console.log('\n--- 벡터 DB 구축 프로세스 완료 ---');
     }
 }
 
