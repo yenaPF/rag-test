@@ -68,12 +68,10 @@ class DatabaseClient {
         waitForConnections: true,
         connectionLimit: config.connectionLimit,
         queueLimit: 0,
-        acquireTimeout: config.acquireTimeout,
-        timeout: config.timeout,
         // 추가 보안 및 성능 설정
         ssl: process.env.DB_SSL === 'true' ? {
           rejectUnauthorized: false
-        } : false,
+        } : undefined,
         dateStrings: true, // 날짜를 문자열로 반환
         supportBigNumbers: true,
         bigNumberStrings: true,

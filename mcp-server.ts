@@ -9,7 +9,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { config } from 'dotenv';
 import { OllamaEmbeddings } from '@langchain/community/embeddings/ollama';
-import { ChromaClient } from 'chromadb';
+import { QdrantClient } from '@qdrant/js-client-rest';
 import { SchemaRAG } from './scripts/schema_rag';
 import { MCPServerConfig, MCPResponse, SearchResult, QueryOptions } from './types';
 
@@ -22,7 +22,7 @@ config();
 class EnhancedRAGServer {
   private server: Server;
   private schemaRAG: SchemaRAG | null = null;
-  private chromaClient: ChromaClient | null = null;
+  private qdrantClient: QdrantClient | null = null;
   private config: MCPServerConfig;
 
   constructor() {
@@ -169,7 +169,15 @@ class EnhancedRAGServer {
         }
       } catch (error) {
         console.error(`[RAG] Tool execution error for ${name}:`, error);
-        return this.createErrorResponse(`오류 발생: ${error instanceof Error ? error.message : String(error)}`);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `오류 발생: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
       }
     });
   }
@@ -181,22 +189,20 @@ class EnhancedRAGServer {
     if (!this.schemaRAG) {
       console.error('[RAG] SchemaRAG 초기화 중...');
       
-      // ChromaDB 클라이언트 생성
-      this.chromaClient = new ChromaClient({
-        path: process.env.CHROMA_DB_PATH || './chroma'
+      // Qdrant 클라이언트 생성
+      this.qdrantClient = new QdrantClient({
+        url: process.env.QDRANT_URL || 'http://localhost:6333',
+        apiKey: process.env.QDRANT_API_KEY
       });
 
-      // 임베딩 모델 생성
+      // 임베딩 모델 생성 (한국어 지원)
       const embeddings = new OllamaEmbeddings({
         baseUrl: process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
-        model: process.env.OLLAMA_MODEL || 'nomic-embed-text',
-        requestOptions: {
-          timeout: this.config.timeout,
-        },
+        model: process.env.OLLAMA_MODEL || 'jhgan/ko-sroberta-multitask',
       });
 
       // SchemaRAG 인스턴스 생성 및 초기화
-      this.schemaRAG = new SchemaRAG(this.chromaClient, embeddings);
+      this.schemaRAG = new SchemaRAG(this.qdrantClient, embeddings);
       await this.schemaRAG.initialize(process.env.COLLECTION_NAME || 'schema_documents');
       
       console.error('[RAG] SchemaRAG 초기화 완료');
@@ -206,7 +212,7 @@ class EnhancedRAGServer {
   /**
    * 스키마 검색을 수행합니다.
    */
-  private async searchSchema(args: any): Promise<MCPResponse> {
+  private async searchSchema(args: any) {
     const {
       query,
       topK = 5,
@@ -288,7 +294,7 @@ class EnhancedRAGServer {
   /**
    * 모든 테이블 목록을 조회합니다.
    */
-  private async listAllTables(args: any = {}): Promise<MCPResponse> {
+  private async listAllTables(args: any = {}) {
     const { groupByDomain = true, includeStats = true } = args;
 
     console.error('[RAG] 테이블 목록 조회 중...');
@@ -361,7 +367,7 @@ class EnhancedRAGServer {
   /**
    * 테이블 관계 정보를 조회합니다.
    */
-  private async getTableRelationships(args: any): Promise<MCPResponse> {
+  private async getTableRelationships(args: any) {
     const { tableName, depth = 2 } = args;
 
     console.error(`[RAG] 테이블 관계 조회: ${tableName}, 깊이: ${depth}`);
@@ -432,7 +438,7 @@ class EnhancedRAGServer {
   /**
    * 캐시 통계 정보를 조회합니다.
    */
-  private async getCacheStats(): Promise<MCPResponse> {
+  private async getCacheStats() {
     console.error('[RAG] 캐시 통계 조회 중...');
 
     const stats = this.schemaRAG!.getCacheStats();
@@ -467,9 +473,8 @@ class EnhancedRAGServer {
   /**
    * 응답 객체를 생성합니다.
    */
-  private createResponse(text: string): MCPResponse {
+  private createResponse(text: string) {
     return {
-      success: true,
       content: [
         {
           type: 'text',
@@ -482,15 +487,15 @@ class EnhancedRAGServer {
   /**
    * 오류 응답 객체를 생성합니다.
    */
-  private createErrorResponse(errorMessage: string): MCPResponse {
+  private createErrorResponse(errorMessage: string) {
     return {
-      success: false,
       content: [
         {
           type: 'text',
           text: errorMessage,
         },
       ],
+      isError: true,
     };
   }
 

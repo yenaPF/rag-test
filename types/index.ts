@@ -24,10 +24,11 @@ export interface MCPServerConfig {
 }
 
 export interface MCPResponse<T = any> {
-  success: boolean;
-  data?: T;
-  error?: string;
-  metadata?: Record<string, any>;
+  content: Array<{
+    type: 'text';
+    text: string;
+  }>;
+  isError?: boolean;
 }
 
 // Utility types

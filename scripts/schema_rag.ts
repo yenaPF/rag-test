@@ -1,20 +1,20 @@
 // scripts/schema_rag.ts
 
 import { TableInfo, SchemaMetadata, SearchResult, QueryOptions, SchemaCache, CacheEntry } from '../types';
-import { ChromaClient, Collection } from 'chromadb';
+import { QdrantClient } from '@qdrant/js-client-rest';
 
 /**
  * 고도화된 스키마 RAG 시스템
  * 파이썬 버전의 SchemaRAG 클래스를 TypeScript로 구현
  */
 export class SchemaRAG {
-  private vectorClient: ChromaClient;
-  private collection: Collection | null = null;
+  private vectorClient: QdrantClient;
+  private collectionName: string | null = null;
   private cache: SchemaCache;
   private embeddingModel: any; // Ollama embedding model
   private readonly CACHE_TTL = 5 * 60 * 1000; // 5분
 
-  constructor(vectorClient: ChromaClient, embeddingModel: any) {
+  constructor(vectorClient: QdrantClient, embeddingModel: any) {
     this.vectorClient = vectorClient;
     this.embeddingModel = embeddingModel;
     this.cache = {
@@ -29,12 +29,19 @@ export class SchemaRAG {
    * @param collectionName 컬렉션 이름
    */
   async initialize(collectionName: string = 'schema_documents'): Promise<void> {
+    this.collectionName = collectionName;
+    
     try {
-      this.collection = await this.vectorClient.getCollection({ name: collectionName });
+      const collectionInfo = await this.vectorClient.getCollection(collectionName);
       console.log(`기존 컬렉션 '${collectionName}' 연결 완료`);
     } catch (error) {
       console.log(`컬렉션 '${collectionName}' 생성 중...`);
-      this.collection = await this.vectorClient.createCollection({ name: collectionName });
+      await this.vectorClient.createCollection(collectionName, {
+        vectors: {
+          size: 768, // nomic-embed-text 임베딩 차원
+          distance: 'Cosine'
+        }
+      });
       console.log(`새 컬렉션 '${collectionName}' 생성 완료`);
     }
   }
@@ -45,65 +52,44 @@ export class SchemaRAG {
    * @returns 임베딩용 종합 텍스트
    */
   private prepareEmbeddingText(tableInfo: TableInfo): string {
-    const textParts: string[] = [
-      `테이블명: ${tableInfo.tableName}`,
-      `스키마: ${tableInfo.schemaName}`,
-      `설명: ${tableInfo.description}`,
-      `비즈니스 도메인: ${tableInfo.businessDomain}`,
-      `행 수: ${tableInfo.rowCount}`,
-      `엔진: ${tableInfo.engine || 'Unknown'}`,
-      `\n컬럼 정보:`
+    const parts: string[] = [
+      `테이블: ${tableInfo.tableName}`,
+      `설명: ${tableInfo.description}`
     ];
 
-    // 컬럼 정보 추가
-    for (const col of tableInfo.columns) {
-      let colText = `- ${col.name} (${col.dataType}): ${col.description}`;
-      
-      if (col.isPrimaryKey) colText += ' [PK]';
-      if (col.isForeignKey) colText += ` [FK -> ${col.foreignKeyReference}]`;
-      if (!col.isNullable) colText += ' [NOT NULL]';
-      if (col.constraints.length > 0) colText += ` [${col.constraints.join(', ')}]`;
-      
-      textParts.push(colText);
-    }
-
-    // 관계 정보 추가
-    if (tableInfo.relationships.length > 0) {
-      textParts.push('\n관계 정보:');
-      for (const rel of tableInfo.relationships) {
-        textParts.push(
-          `- ${rel.relationshipName}: ${rel.relatedTable} (${rel.relationshipType}) ` +
-          `${rel.localColumn} -> ${rel.foreignColumn}`
-        );
+    // 컬럼 정보 추가 (간결하게)
+    if (tableInfo.columns.length > 0) {
+      const columnTexts: string[] = [];
+      for (const col of tableInfo.columns) {
+        let colText = `${col.name} (${col.dataType})`;
+        if (col.description) {
+          colText += `: ${col.description}`;
+        }
+        columnTexts.push(colText);
       }
+      parts.push(`컬럼: ${columnTexts.join(', ')}`);
     }
 
-    // 인덱스 정보 추가
-    if (tableInfo.indexedColumns.length > 0) {
-      textParts.push(`\n인덱스된 컬럼: ${tableInfo.indexedColumns.join(', ')}`);
+    // 비즈니스 도메인 추가
+    if (tableInfo.businessDomain) {
+      parts.push(`도메인: ${tableInfo.businessDomain}`);
     }
 
     // 일반적인 쿼리 패턴 추가
     if (tableInfo.commonQueries.length > 0) {
-      textParts.push('\n자주 사용되는 쿼리:');
-      for (const query of tableInfo.commonQueries) {
-        textParts.push(`- ${query.description} (빈도: ${query.frequency})`);
-        if (query.exampleSql) {
-          textParts.push(`  예시: ${query.exampleSql}`);
-        }
-      }
+      const queries = tableInfo.commonQueries.map(q => q.description);
+      parts.push(`사용 예시: ${queries.join(', ')}`);
     }
 
-    // 샘플 데이터 추가 (컬럼명만)
-    if (tableInfo.sampleData.length > 0) {
-      textParts.push('\n샘플 데이터 구조:');
-      const headers = tableInfo.sampleData[0];
-      if (Array.isArray(headers)) {
-        textParts.push(`컬럼: ${headers.join(', ')}`);
-      }
+    // 관계 정보 추가
+    if (tableInfo.relationships.length > 0) {
+      const relationships = tableInfo.relationships.map(rel => 
+        `${rel.relatedTable} (${rel.relationshipType})`
+      );
+      parts.push(`관련 테이블: ${relationships.join(', ')}`);
     }
 
-    return textParts.join('\n');
+    return parts.join(' | ');
   }
 
   /**
@@ -111,22 +97,23 @@ export class SchemaRAG {
    * @param schemaMetadata 스키마 메타데이터
    */
   async indexSchema(schemaMetadata: SchemaMetadata): Promise<void> {
-    if (!this.collection) {
+    if (!this.collectionName) {
       throw new Error('Collection not initialized. Call initialize() first.');
     }
 
     console.log('스키마 벡터 인덱싱 시작...');
     
-    const documents: string[] = [];
-    const metadatas: any[] = [];
-    const ids: string[] = [];
+    const points: any[] = [];
 
     for (const [tableName, tableInfo] of Object.entries(schemaMetadata.tables)) {
       // 임베딩 텍스트 생성
       const embeddingText = this.prepareEmbeddingText(tableInfo);
       
+      // 임베딩 생성
+      const embedding = await this.embeddingModel.embedDocuments([embeddingText]);
+      
       // 메타데이터 준비
-      const metadata = {
+      const payload = {
         table_name: tableInfo.tableName,
         schema_name: tableInfo.schemaName,
         business_domain: tableInfo.businessDomain,
@@ -136,12 +123,15 @@ export class SchemaRAG {
         indexed_columns: tableInfo.indexedColumns,
         engine: tableInfo.engine,
         primary_keys: tableInfo.columns.filter(col => col.isPrimaryKey).map(col => col.name),
-        foreign_keys: tableInfo.columns.filter(col => col.isForeignKey).map(col => col.name)
+        foreign_keys: tableInfo.columns.filter(col => col.isForeignKey).map(col => col.name),
+        document: embeddingText
       };
 
-      documents.push(embeddingText);
-      metadatas.push(metadata);
-      ids.push(`${tableInfo.schemaName}.${tableInfo.tableName}`);
+      points.push({
+        id: `${tableInfo.schemaName}.${tableInfo.tableName}`,
+        vector: embedding[0],
+        payload
+      });
 
       // 캐시에도 저장
       this.cacheTableInfo(tableName, tableInfo);
@@ -149,23 +139,27 @@ export class SchemaRAG {
 
     // 기존 데이터 삭제 후 새로 추가
     try {
-      const existingData = await this.collection.get();
-      if (existingData.ids.length > 0) {
-        await this.collection.delete({ ids: existingData.ids });
-        console.log(`기존 ${existingData.ids.length}개 문서 삭제`);
-      }
+      await this.vectorClient.deleteCollection(this.collectionName);
+      console.log('기존 컬렉션 삭제');
+      
+      await this.vectorClient.createCollection(this.collectionName, {
+        vectors: {
+          size: 768,
+          distance: 'Cosine'
+        }
+      });
+      console.log('새 컬렉션 생성');
     } catch (error) {
-      console.log('기존 데이터 삭제 중 오류 (무시 가능):', error);
+      console.log('컬렉션 재생성 중 오류 (무시 가능):', error);
     }
 
     // 새 데이터 추가
-    await this.collection.add({
-      ids,
-      documents,
-      metadatas
+    await this.vectorClient.upsert(this.collectionName, {
+      wait: true,
+      points
     });
 
-    console.log(`${ids.length}개 테이블 벡터 인덱싱 완료`);
+    console.log(`${points.length}개 테이블 벡터 인덱싱 완료`);
   }
 
   /**
@@ -178,7 +172,7 @@ export class SchemaRAG {
     userQuery: string, 
     options: Partial<QueryOptions> = {}
   ): Promise<SearchResult[]> {
-    if (!this.collection) {
+    if (!this.collectionName) {
       throw new Error('Collection not initialized. Call initialize() first.');
     }
 
@@ -200,56 +194,57 @@ export class SchemaRAG {
 
     console.log(`스키마 검색 실행: "${userQuery}"`);
 
-    // 메타데이터 필터 구성
-    const whereCondition: any = {};
+    // 쿼리 임베딩 생성
+    const queryEmbedding = await this.embeddingModel.embedDocuments([userQuery]);
+
+    // 필터 구성
+    const filter: any = {};
     if (opts.domains && opts.domains.length > 0) {
-      whereCondition.business_domain = { $in: opts.domains };
+      filter.business_domain = { $in: opts.domains };
     }
     if (opts.tableNames && opts.tableNames.length > 0) {
-      whereCondition.table_name = { $in: opts.tableNames };
+      filter.table_name = { $in: opts.tableNames };
     }
 
     // 벡터 검색 실행
-    const searchResults = await this.collection.query({
-      queryTexts: [userQuery],
-      nResults: opts.topK,
-      where: Object.keys(whereCondition).length > 0 ? whereCondition : undefined,
-      include: ['documents', 'metadatas', 'distances']
+    const searchResults = await this.vectorClient.search(this.collectionName, {
+      vector: queryEmbedding[0],
+      limit: opts.topK,
+      filter: Object.keys(filter).length > 0 ? filter : undefined,
+      with_payload: true,
+      with_vector: false
     });
 
     const results: SearchResult[] = [];
     
-    if (searchResults.ids?.[0] && searchResults.metadatas?.[0] && searchResults.distances?.[0]) {
-      for (let i = 0; i < searchResults.ids[0].length; i++) {
-        const metadata = searchResults.metadatas[0][i] as any;
-        const distance = searchResults.distances[0][i];
-        const score = Math.max(0, 1 - distance); // 거리를 유사도로 변환
+    for (const hit of searchResults) {
+      const score = hit.score;
+      const payload = hit.payload as any;
 
-        if (score >= opts.threshold) {
-          // 캐시에서 테이블 정보 조회
-          const tableInfo = await this.getTableInfo(metadata.table_name);
-          if (tableInfo) {
-            const result: SearchResult = {
-              table: tableInfo,
-              score,
-              matchedContent: searchResults.documents?.[0]?.[i] || '',
-              relatedTables: []
-            };
+      if (score >= opts.threshold) {
+        // 캐시에서 테이블 정보 조회
+        const tableInfo = await this.getTableInfo(payload.table_name);
+        if (tableInfo) {
+          const result: SearchResult = {
+            table: tableInfo,
+            score,
+            matchedContent: payload.document || '',
+            relatedTables: []
+          };
 
-            // 관련 테이블 자동 포함
-            if (opts.includeRelated && tableInfo.relationships.length > 0) {
-              const relatedTables: TableInfo[] = [];
-              for (const rel of tableInfo.relationships) {
-                const relatedTable = await this.getTableInfo(rel.relatedTable);
-                if (relatedTable && !results.some(r => r.table.tableName === relatedTable.tableName)) {
-                  relatedTables.push(relatedTable);
-                }
+          // 관련 테이블 자동 포함
+          if (opts.includeRelated && tableInfo.relationships.length > 0) {
+            const relatedTables: TableInfo[] = [];
+            for (const rel of tableInfo.relationships) {
+              const relatedTable = await this.getTableInfo(rel.relatedTable);
+              if (relatedTable && !results.some(r => r.table.tableName === relatedTable.tableName)) {
+                relatedTables.push(relatedTable);
               }
-              result.relatedTables = relatedTables;
             }
-
-            results.push(result);
+            result.relatedTables = relatedTables;
           }
+
+          results.push(result);
         }
       }
     }

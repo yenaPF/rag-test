@@ -22,7 +22,7 @@
     "@langchain/community": "^0.3.19",
     "@langchain/core": "^0.3.26",
     "@modelcontextprotocol/sdk": "^1.0.4",
-    "chromadb": "^1.10.5",
+    "@qdrant/js-client-rest": "^1.14.1",
     "dotenv": "^16.4.5",
     "langchain": "^0.3.8",
     "mysql2": "^3.11.4"

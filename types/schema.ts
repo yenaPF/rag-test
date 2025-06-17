@@ -33,7 +33,7 @@ export interface ColumnInfo {
 
 export interface TableRelationship {
   /** Type of relationship */
-  relationshipType: 'one-to-one' | 'one-to-many' | 'many-to-many';
+  relationshipType: 'one-to-one' | 'one-to-many' | 'many-to-many' | 'many-to-one';
   /** Name of the related table */
   relatedTable: string;
   /** Local column name in this table */
@@ -159,7 +159,7 @@ export interface EmbeddingConfig {
 
 export interface VectorStoreConfig {
   /** Vector store type */
-  type: 'chroma' | 'pinecone' | 'weaviate';
+  type: 'chroma' | 'pinecone' | 'weaviate' | 'qdrant';
   /** Collection/Index name */
   collectionName: string;
   /** Connection URL */
