@@ -292,3 +292,138 @@ npm install @langchain/openai
 1. **OpenAI 임베딩으로 교체** (즉시 개선 효과, 하지만 유료)
 2. **기존 MySQL MCP 서버와 비교 분석**
 3. **실제 업무에서는 직접 DB 연결 방식 우선 고려**
+
+
+
+Hugging Face 기반 RAG 시스템 실행 가이드
+
+1. 환경 설정
+
+1.1 Qdrant 서버 실행
+# Docker로 Qdrant 실행 (권장)
+docker run -p 6333:6333 -p 6334:6334 qdrant/qdrant
+
+1.2 환경 변수 설정
+# .env.example을 .env로 복사
+cp .env.example .env
+
+# .env 파일 편집
+nano .env
+
+.env 파일 예시:
+# 데이터베이스 설정
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=your_username
+DB_PASSWORD=your_password
+DB_NAME=your_database
+
+# Qdrant 설정
+QDRANT_URL=http://localhost:6333
+
+# Hugging Face 모델 설정
+HF_MODEL=jhgan/ko-sroberta-multitask
+EMBEDDING_DIMENSION=768
+
+# 벡터 DB 설정
+COLLECTION_NAME=schema_documents
+
+2. 의존성 설치
+
+# 이미 설치되었지만 확인용
+npm install
+
+# TypeScript 컴파일
+npm run compile
+
+3. 벡터 DB 구축
+
+# Hugging Face 모델로 벡터 DB 구축
+npm run build-db-ts
+
+실행 과정:
+1. 모델 자동 다운로드: 첫 실행 시 Hugging Face에서 자동으로 모델 다운로드
+2. 스키마 추출: MySQL에서 테이블, 컬럼, 관계 정보 추출
+3. 임베딩 생성: 한국어 모델로 스키마 정보를 벡터화
+4. Qdrant 저장: 생성된 벡터를 Qdrant에 저장
+5. 무결성 테스트: 검색 기능 테스트
+
+4. MCP 서버 실행
+
+# Hugging Face 기반 서버 시작
+npm run mcp-server-ts
+
+5. 지원되는 한국어 모델들
+
+환경 변수 HF_MODEL에서 선택 가능:
+
+한국어 특화 모델:
+- jhgan/ko-sroberta-multitask (768차원) - 기본값
+- jhgan/ko-sbert-multitask (768차원)
+- bongsoo/kpf-sbert-v1 (768차원)
+
+다국어 모델:
+- sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2 (384차원)
+- sentence-transformers/all-MiniLM-L6-v2 (384차원)
+
+6. 장점 및 특징
+
+Hugging Face vs Ollama 비교:
+
+| 기능      | Hugging Face | Ollama      |
+  |---------|--------------|-------------|
+| 설치      | npm 패키지만 필요  | 별도 서버 설치 필요 |
+| 모델 관리   | 자동 다운로드/캐싱   | 수동 pull 필요  |
+| 메모리 사용  | 효율적          | 많은 메모리 필요   |
+| 오프라인 지원 | 첫 다운로드 후 가능  | 완전 오프라인     |
+| 성능      | 최적화됨         | 빠름          |
+
+7. 사용법
+
+Claude Desktop 설정:
+{
+"mcpServers": {
+"rag-vector-search": {
+"command": "node",
+"args": ["/path/to/your/project/mcp-server.js"]
+}
+}
+}
+
+검색 예시:
+# 한국어 자연어 검색
+사용자 정보 테이블을 찾아주세요
+주문과 관련된 모든 테이블 보여주세요
+외래키 관계가 있는 테이블들을 알려주세요
+
+8. 문제 해결
+
+모델 로딩 실패시:
+- 자동으로 대체 모델(sentence-transformers/all-MiniLM-L6-v2)로 fallback
+- 인터넷 연결 확인
+- 모델 캐시 삭제: ~/.cache/huggingface/
+
+메모리 부족시:
+- 더 작은 모델 사용: sentence-transformers/all-MiniLM-L6-v2
+- 배치 크기 조정: 코드에서 batchSize 값 감소
+
+성능 최적화:
+- 첫 실행 후 모델이 캐시되어 빠른 시작
+- CPU 최적화된 추론
+- 메모리 효율적인 배치 처리
+
+이제 Ollama 없이도 강력한 한국어 임베딩 기능을 사용할 수 있습니다!
+
+
+1. 환경 설정
+# .env.example을 .env로 복사하고 DB 정보 설정
+cp .env.example .env
+
+2. Qdrant 벡터 DB 실행
+   docker run -p 6333:6333 -p 6334:6334 qdrant/qdrant
+
+3. 벡터 DB 구축
+   npm run build-db-ts
+
+4. 검색 테스트
+   ts-node scripts/query_vector_db.ts "사용자 정보를 담고 있는 테이블은 무엇인가요?"

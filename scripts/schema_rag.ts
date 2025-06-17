@@ -2,6 +2,7 @@
 
 import { TableInfo, SchemaMetadata, SearchResult, QueryOptions, SchemaCache, CacheEntry } from '../types';
 import { QdrantClient } from '@qdrant/js-client-rest';
+import { HuggingFaceEmbeddings } from './huggingface_embeddings';
 
 /**
  * 고도화된 스키마 RAG 시스템
@@ -11,7 +12,7 @@ export class SchemaRAG {
   private vectorClient: QdrantClient;
   private collectionName: string | null = null;
   private cache: SchemaCache;
-  private embeddingModel: any; // Ollama embedding model
+  private embeddingModel: HuggingFaceEmbeddings;
   private readonly CACHE_TTL = 5 * 60 * 1000; // 5분
 
   constructor(vectorClient: QdrantClient, embeddingModel: any) {
@@ -38,7 +39,7 @@ export class SchemaRAG {
       console.log(`컬렉션 '${collectionName}' 생성 중...`);
       await this.vectorClient.createCollection(collectionName, {
         vectors: {
-          size: 768, // nomic-embed-text 임베딩 차원
+          size: 384, // all-MiniLM-L6-v2 임베딩 차원
           distance: 'Cosine'
         }
       });
@@ -127,10 +128,16 @@ export class SchemaRAG {
         document: embeddingText
       };
 
+      // Qdrant는 숫자 ID 또는 UUID만 허용하므로 해시 기반 숫자 ID 생성
+      const tableId = this.generateNumericId(`${tableInfo.schemaName}.${tableInfo.tableName}`);
+      
       points.push({
-        id: `${tableInfo.schemaName}.${tableInfo.tableName}`,
+        id: tableId,
         vector: embedding[0],
-        payload
+        payload: {
+          ...payload,
+          table_full_name: `${tableInfo.schemaName}.${tableInfo.tableName}` // 원본 이름 유지
+        }
       });
 
       // 캐시에도 저장
@@ -144,7 +151,7 @@ export class SchemaRAG {
       
       await this.vectorClient.createCollection(this.collectionName, {
         vectors: {
-          size: 768,
+          size: 384,
           distance: 'Cosine'
         }
       });
@@ -361,6 +368,21 @@ export class SchemaRAG {
       relationships: getStats(this.cache.relationships),
       searchResults: getStats(this.cache.searchResults)
     };
+  }
+
+  /**
+   * 문자열을 숫자 ID로 변환합니다 (해시 기반).
+   * @param str 변환할 문자열
+   * @returns 32비트 양의 정수
+   */
+  private generateNumericId(str: string): number {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // 32비트 정수로 변환
+    }
+    return Math.abs(hash);
   }
 
   /**

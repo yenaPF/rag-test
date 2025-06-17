@@ -1,11 +1,11 @@
 // scripts/build_vector_db.ts
 
 import { config } from 'dotenv';
-import { OllamaEmbeddings } from '@langchain/community/embeddings/ollama';
 import { QdrantClient } from '@qdrant/js-client-rest';
-import { extractSchemaMetadata } from './schema_extractor';
-import { SchemaRAG } from './schema_rag';
-import { closeDbPool } from './db_client';
+import { extractSchemaMetadata } from './schema_extractor.js';
+import { SchemaRAG } from './schema_rag.js';
+import { HuggingFaceEmbeddings } from './huggingface_embeddings.js';
+import { closeDbPool } from './db_client.js';
 import { EmbeddingConfig, VectorStoreConfig } from '../types';
 
 // 환경 변수 로드
@@ -17,7 +17,7 @@ config();
 function loadConfig(): { embedding: EmbeddingConfig; vectorStore: VectorStoreConfig } {
   return {
     embedding: {
-      modelName: process.env.OLLAMA_MODEL || 'jhgan/ko-sroberta-multitask',
+      modelName: process.env.HF_MODEL || 'jhgan/ko-sroberta-multitask',
       dimension: parseInt(process.env.EMBEDDING_DIMENSION || '768', 10),
       chunkSize: parseInt(process.env.CHUNK_SIZE || '1000', 10),
       chunkOverlap: parseInt(process.env.CHUNK_OVERLAP || '200', 10)
@@ -47,14 +47,17 @@ async function buildVectorDb(): Promise<void> {
       dimension: config.embedding.dimension
     });
 
-    // 1. 임베딩 모델 초기화 (한국어 지원)
+    // 1. 임베딩 모델 초기화 (Hugging Face 한국어 지원)
     console.log('\n1. 임베딩 모델 초기화...');
-    const embeddings = new OllamaEmbeddings({
-      baseUrl: process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
-      model: config.embedding.modelName,
-      // keepAlive: '5m', // 모델을 메모리에 5분간 유지
+    const embeddings = new HuggingFaceEmbeddings({
+      modelName: config.embedding.modelName,
+      dimension: config.embedding.dimension
     });
-    console.log(`Ollama 한국어 임베딩 모델 로드 완료: ${config.embedding.modelName}`);
+    
+    // 모델 초기화
+    await embeddings.initialize();
+    const modelInfo = embeddings.getModelInfo();
+    console.log(`Hugging Face 한국어 임베딩 모델 로드 완료: ${modelInfo.modelName} (${modelInfo.dimension}D)`);
 
     // 2. Qdrant 클라이언트 초기화
     console.log('\n2. Qdrant 클라이언트 초기화...');
@@ -102,7 +105,7 @@ async function buildVectorDb(): Promise<void> {
     throw error;
   } finally {
     await closeDbPool();
-    console.log('데이터베이스 연결 풀 종료');
+    console.log('리소스 정리 완료');
   }
 }
 
@@ -210,7 +213,7 @@ async function testRelatedTableDiscovery(schemaRAG: SchemaRAG): Promise<void> {
 }
 
 // 스크립트 실행
-if (require.main === module) {
+if (import.meta.url === `file://${process.argv[1]}`) {
   buildVectorDb()
     .then(() => {
       console.log('\n🎉 모든 작업이 성공적으로 완료되었습니다!');

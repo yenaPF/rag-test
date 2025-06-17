@@ -8,9 +8,9 @@ import {
   Tool,
 } from '@modelcontextprotocol/sdk/types.js';
 import { config } from 'dotenv';
-import { OllamaEmbeddings } from '@langchain/community/embeddings/ollama';
 import { QdrantClient } from '@qdrant/js-client-rest';
 import { SchemaRAG } from './scripts/schema_rag';
+import { HuggingFaceEmbeddings } from './scripts/huggingface_embeddings';
 import { MCPServerConfig, MCPResponse, SearchResult, QueryOptions } from './types';
 
 // 환경 변수 로드
@@ -195,11 +195,14 @@ class EnhancedRAGServer {
         apiKey: process.env.QDRANT_API_KEY
       });
 
-      // 임베딩 모델 생성 (한국어 지원)
-      const embeddings = new OllamaEmbeddings({
-        baseUrl: process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
-        model: process.env.OLLAMA_MODEL || 'jhgan/ko-sroberta-multitask',
+      // 임베딩 모델 생성 (Hugging Face 한국어 지원)
+      const embeddings = new HuggingFaceEmbeddings({
+        modelName: process.env.HF_MODEL || 'jhgan/ko-sroberta-multitask',
+        dimension: parseInt(process.env.EMBEDDING_DIMENSION || '768', 10)
       });
+      
+      // 모델 초기화
+      await embeddings.initialize();
 
       // SchemaRAG 인스턴스 생성 및 초기화
       this.schemaRAG = new SchemaRAG(this.qdrantClient, embeddings);
