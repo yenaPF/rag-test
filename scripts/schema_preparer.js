@@ -14,7 +14,7 @@ async function prepareSchemaForRAG() {
     try {
         const schema = await extractSchemaMetadata(); // 기본 메타데이터 추출
 
-        console.log('스키마에 상세 설명 및 샘플 데이터 추가 시작...');
+        //console.log('스키마에 상세 설명 및 샘플 데이터 추가 시작...');
         connection = await pool.getConnection(); // 샘플 데이터 추출을 위해 연결 사용
 
         for (const tableName in schema) {
@@ -32,7 +32,7 @@ async function prepareSchemaForRAG() {
                         tableInfo.sampleData.push(Object.values(row));
                     });
                 }
-                console.log(`- \`${tableName}\` 테이블 샘플 데이터 추출 완료.`);
+                ////console.log(`- \`${tableName}\` 테이블 샘플 데이터 추출 완료.`);
             } catch (err) {
                 console.warn(`- 경고: \`${tableName}\` 테이블 샘플 데이터 추출 실패 (${err.message}). 샘플 데이터를 생략합니다.`);
                 tableInfo.sampleData = []; // 오류 발생 시 빈 배열로 설정
@@ -65,11 +65,11 @@ async function prepareSchemaForRAG() {
             // ... 다른 테이블들도 유사하게 추가 설명 ...
         }
 
-        console.log('스키마에 상세 설명 및 샘플 데이터 추가 완료.');
+        //console.log('스키마에 상세 설명 및 샘플 데이터 추가 완료.');
         return schema;
 
     } catch (error) {
-        console.error('스키마 준비 중 오류 발생:', error.message);
+        //console.error('스키마 준비 중 오류 발생:', error.message);
         throw error;
     } finally {
         if (connection) {

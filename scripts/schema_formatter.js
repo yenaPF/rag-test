@@ -9,7 +9,7 @@ const { Document } = require('@langchain/core/documents'); // LangChain Document
  * @returns {Promise<Document[]>} 포맷팅된 스키마 정보가 담긴 LangChain Document 객체 배열
  */
 async function formatSchemaAsDocuments() {
-    console.log('스키마 정보를 Document 형태로 포맷팅 시작...');
+    //console.log('스키마 정보를 Document 형태로 포맷팅 시작...');
     const schema = await prepareSchemaForRAG(); // 2단계에서 준비된 상세 스키마 정보 가져오기
     const documents = [];
 
@@ -71,7 +71,7 @@ async function formatSchemaAsDocuments() {
         }));
     }
 
-    console.log(`총 ${documents.length}개의 스키마 Document 생성 완료.`);
+    //console.log(`총 ${documents.length}개의 스키마 Document 생성 완료.`);
     return documents;
 }
 

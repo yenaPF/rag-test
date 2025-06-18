@@ -57,7 +57,7 @@ export async function extractSchemaMetadata(): Promise<SchemaMetadata> {
 
   try {
     connection = await pool.getConnection();
-    console.log('스키마 메타데이터 추출 시작...');
+    //console.log('스키마 메타데이터 추출 시작...');
 
     const dbName = process.env.DB_NAME;
     if (!dbName) {
@@ -245,11 +245,11 @@ export async function extractSchemaMetadata(): Promise<SchemaMetadata> {
       totalRelationships: Object.values(tables).reduce((sum, table) => sum + table.relationships.length, 0)
     };
 
-    console.log(`스키마 메타데이터 추출 완료. 테이블 ${schemaMetadata.totalTables}개, 관계 ${schemaMetadata.totalRelationships}개`);
+    //console.log(`스키마 메타데이터 추출 완료. 테이블 ${schemaMetadata.totalTables}개, 관계 ${schemaMetadata.totalRelationships}개`);
     return schemaMetadata;
 
   } catch (error) {
-    console.error('스키마 메타데이터 추출 중 오류 발생:', error);
+    //console.error('스키마 메타데이터 추출 중 오류 발생:', error);
     throw error;
   } finally {
     if (connection) {

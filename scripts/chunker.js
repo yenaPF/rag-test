@@ -13,19 +13,19 @@ const { RecursiveCharacterTextSplitter } = require('langchain/text_splitter'); /
  * @returns {Promise<Document[]>} 분할(또는 그대로 전달)된 LangChain Document 객체 배열
  */
 async function chunkSchemaDocuments() {
-    console.log('스키마 Document 청킹 시작...');
+    //console.log('스키마 Document 청킹 시작...');
     const rawDocuments = await formatSchemaAsDocuments(); // 3단계에서 포맷팅된 Document 가져오기
 
     // ### 시나리오 1: 각 테이블 Document가 이미 적절한 청크 크기라고 판단될 경우 (추가 분할 없음)
     // 이 경우, 3단계에서 생성된 Document들을 그대로 반환합니다.
-    console.log("각 테이블 Document가 이미 의미 단위로 청킹되어 추가 분할을 건너뜁니다.");
+    //console.log("각 테이블 Document가 이미 의미 단위로 청킹되어 추가 분할을 건너뜁니다.");
     return rawDocuments;
 
 
     // ### 시나리오 2: 각 테이블 Document가 너무 길어져 추가 분할이 필요한 경우
     // 이 경우, RecursiveCharacterTextSplitter를 사용하여 분할합니다.
     /*
-    console.log("테이블 Document가 너무 길 경우를 대비하여 RecursiveCharacterTextSplitter를 사용합니다.");
+    //console.log("테이블 Document가 너무 길 경우를 대비하여 RecursiveCharacterTextSplitter를 사용합니다.");
 
     // 토큰 카운팅을 위한 인코더 설정 (OpenAI 모델과 유사한 토큰 분할)
     // const tokenizer = get_encoding("cl100k_base"); // gpt-4, gpt-3.5-turbo 등이 사용하는 인코딩
@@ -48,7 +48,7 @@ async function chunkSchemaDocuments() {
         });
     }
 
-    console.log(`총 ${rawDocuments.length}개의 원본 Document를 ${splitDocuments.length}개의 청크로 분할 완료.`);
+    //console.log(`총 ${rawDocuments.length}개의 원본 Document를 ${splitDocuments.length}개의 청크로 분할 완료.`);
     return splitDocuments;
     */
 }

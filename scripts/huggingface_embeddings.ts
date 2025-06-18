@@ -24,7 +24,7 @@ export class HuggingFaceEmbeddings {
    */
   async initialize(): Promise<void> {
     if (!this.model) {
-      console.log(`Hugging Face 모델 로딩 중: ${this.modelName}`);
+      //console.log(`Hugging Face 모델 로딩 중: ${this.modelName}`);
       
       try {
         // feature-extraction 파이프라인 생성
@@ -33,17 +33,17 @@ export class HuggingFaceEmbeddings {
           local_files_only: false,
         });
         
-        console.log(`모델 로딩 완료: ${this.modelName}`);
+        //console.log(`모델 로딩 완료: ${this.modelName}`);
       } catch (error) {
-        console.error('모델 로딩 실패:', error);
+        //console.error('모델 로딩 실패:', error);
         
         // 대체 모델 시도
-        console.log('대체 모델 시도: Xenova/all-MiniLM-L6-v2');
+        //console.log('대체 모델 시도: Xenova/all-MiniLM-L6-v2');
         this.model = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
         this.modelName = 'Xenova/all-MiniLM-L6-v2';
         this.dimension = 384; // MiniLM 모델의 차원
         
-        console.log('대체 모델 로딩 완료');
+        //console.log('대체 모델 로딩 완료');
       }
     }
   }
@@ -67,8 +67,8 @@ export class HuggingFaceEmbeddings {
         normalize: true
       });
 
-      console.log('Raw embedding result:', typeof result, Array.isArray(result), result?.constructor?.name);
-      console.log('Result shape:', result?.dims || result?.shape);
+      //console.log('Raw embedding result:', typeof result, Array.isArray(result), result?.constructor?.name);
+      //console.log('Result shape:', result?.dims || result?.shape);
       
       // 결과를 1차원 배열로 변환
       let embedding: number[];
@@ -79,7 +79,7 @@ export class HuggingFaceEmbeddings {
         
         // Tensor 차원 확인
         const dims = result.dims || result.shape;
-        console.log('Tensor dimensions:', dims);
+        //console.log('Tensor dimensions:', dims);
         
         if (dims && dims.length === 2 && dims[0] === 1) {
           // [1, 384] 형태인 경우 - 정상적인 pooled embedding
@@ -103,7 +103,7 @@ export class HuggingFaceEmbeddings {
           embedding = result;
         }
       } else {
-        console.error('Unexpected result format:', result);
+        //console.error('Unexpected result format:', result);
         throw new Error(`예상치 못한 결과 형식: ${typeof result}`);
       }
 
@@ -123,10 +123,10 @@ export class HuggingFaceEmbeddings {
         throw new Error('임베딩 결과가 비어있습니다.');
       }
 
-      console.log(`임베딩 생성 완료: ${embedding.length}차원`);
+      //console.log(`임베딩 생성 완료: ${embedding.length}차원`);
       return embedding;
     } catch (error) {
-      console.error('임베딩 생성 실패:', error);
+      //console.error('임베딩 생성 실패:', error);
       throw error;
     }
   }
@@ -150,7 +150,7 @@ export class HuggingFaceEmbeddings {
     
     for (let i = 0; i < texts.length; i += batchSize) {
       const batch = texts.slice(i, i + batchSize);
-      console.log(`임베딩 생성 중: ${i + 1}-${Math.min(i + batchSize, texts.length)}/${texts.length}`);
+      //console.log(`임베딩 생성 중: ${i + 1}-${Math.min(i + batchSize, texts.length)}/${texts.length}`);
       
       // 각 텍스트를 개별적으로 처리
       for (const text of batch) {
@@ -158,7 +158,7 @@ export class HuggingFaceEmbeddings {
           const embedding = await this.embedQuery(text);
           embeddings.push(embedding);
         } catch (error) {
-          console.error(`텍스트 임베딩 실패: "${text.substring(0, 50)}..."`, error);
+          //console.error(`텍스트 임베딩 실패: "${text.substring(0, 50)}..."`, error);
           // 에러가 발생한 경우 0 벡터 추가
           embeddings.push(new Array(this.dimension).fill(0));
         }
@@ -190,7 +190,7 @@ export class HuggingFaceEmbeddings {
     if (this.model) {
       // Transformers.js는 자동으로 정리되므로 특별한 정리 작업이 필요하지 않음
       this.model = null;
-      console.log('임베딩 모델 정리 완료');
+      //console.log('임베딩 모델 정리 완료');
     }
   }
 }

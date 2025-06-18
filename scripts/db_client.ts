@@ -55,7 +55,7 @@ class DatabaseClient {
    */
   public async getPool(): Promise<Pool> {
     if (!this.pool) {
-      console.log('MySQL 데이터베이스 풀 생성 시도...');
+      //console.log('MySQL 데이터베이스 풀 생성 시도...');
       
       const config = this.getDatabaseConfig();
       
@@ -83,9 +83,9 @@ class DatabaseClient {
         const connection = await this.pool.getConnection();
         await connection.ping(); // 연결 상태 확인
         connection.release();
-        console.log('MySQL 데이터베이스 연결 풀 성공적으로 생성 및 테스트 완료!');
+        //console.log('MySQL 데이터베이스 연결 풀 성공적으로 생성 및 테스트 완료!');
       } catch (error) {
-        console.error('MySQL 데이터베이스 연결 풀 생성 실패:', error);
+        //console.error('MySQL 데이터베이스 연결 풀 생성 실패:', error);
         if (this.pool) {
           await this.pool.end();
           this.pool = null;
@@ -104,9 +104,9 @@ class DatabaseClient {
     if (this.pool) {
       try {
         await this.pool.end();
-        console.log('MySQL 데이터베이스 연결 풀 종료.');
+        //console.log('MySQL 데이터베이스 연결 풀 종료.');
       } catch (error) {
-        console.error('MySQL 데이터베이스 연결 풀 종료 중 오류:', error);
+        //console.error('MySQL 데이터베이스 연결 풀 종료 중 오류:', error);
       } finally {
         this.pool = null;
       }
@@ -150,7 +150,7 @@ class DatabaseClient {
       connection.release();
       return true;
     } catch (error) {
-      console.error('데이터베이스 연결 테스트 실패:', error);
+      //console.error('데이터베이스 연결 테스트 실패:', error);
       return false;
     }
   }

@@ -9,9 +9,10 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { config } from 'dotenv';
 import { QdrantClient } from '@qdrant/js-client-rest';
-import { SchemaRAG } from './scripts/schema_rag';
-import { HuggingFaceEmbeddings } from './scripts/huggingface_embeddings';
-import { MCPServerConfig, MCPResponse, SearchResult, QueryOptions } from './types';
+import { SchemaRAG } from './scripts/schema_rag.js';
+import { HuggingFaceEmbeddings } from './scripts/huggingface_embeddings.js';
+import { MCPServerConfig, MCPResponse } from './types/index.js';
+import { SearchResult, QueryOptions } from './types/schema.js';
 
 // 환경 변수 로드
 config();
@@ -168,7 +169,7 @@ class EnhancedRAGServer {
             throw new Error(`Unknown tool: ${name}`);
         }
       } catch (error) {
-        console.error(`[RAG] Tool execution error for ${name}:`, error);
+        //console.error(`[RAG] Tool execution error for ${name}:`, error);
         return {
           content: [
             {
@@ -187,7 +188,7 @@ class EnhancedRAGServer {
    */
   private async ensureInitialized(): Promise<void> {
     if (!this.schemaRAG) {
-      console.error('[RAG] SchemaRAG 초기화 중...');
+      console.error(`[DEBUG] SchemaRAG 초기화 시작 - EMBEDDING_DIMENSION=${process.env.EMBEDDING_DIMENSION}`);
       
       // Qdrant 클라이언트 생성
       this.qdrantClient = new QdrantClient({
@@ -195,20 +196,24 @@ class EnhancedRAGServer {
         apiKey: process.env.QDRANT_API_KEY
       });
 
+      console.error(`[DEBUG] Qdrant 클라이언트 생성 완료 - URL: ${process.env.QDRANT_URL || 'http://localhost:6333'}`);
+
       // 임베딩 모델 생성 (Hugging Face 한국어 지원)
       const embeddings = new HuggingFaceEmbeddings({
         modelName: process.env.HF_MODEL || 'jhgan/ko-sroberta-multitask',
         dimension: parseInt(process.env.EMBEDDING_DIMENSION || '768', 10)
       });
       
+      console.error(`[DEBUG] 임베딩 모델 생성 완료 - 차원: ${parseInt(process.env.EMBEDDING_DIMENSION || '768', 10)}`);
+      
       // 모델 초기화
       await embeddings.initialize();
+      console.error(`[DEBUG] 임베딩 모델 초기화 완료`);
 
       // SchemaRAG 인스턴스 생성 및 초기화
       this.schemaRAG = new SchemaRAG(this.qdrantClient, embeddings);
       await this.schemaRAG.initialize(process.env.COLLECTION_NAME || 'schema_documents');
-      
-      console.error('[RAG] SchemaRAG 초기화 완료');
+      console.error(`[DEBUG] SchemaRAG 초기화 완료`);
     }
   }
 
@@ -224,8 +229,6 @@ class EnhancedRAGServer {
       domains,
       tableNames
     } = args;
-
-    console.error(`[RAG] 고도화된 검색 시작: "${query}"`);
 
     const options: Partial<QueryOptions> = {
       topK,
@@ -300,7 +303,7 @@ class EnhancedRAGServer {
   private async listAllTables(args: any = {}) {
     const { groupByDomain = true, includeStats = true } = args;
 
-    console.error('[RAG] 테이블 목록 조회 중...');
+    console.error(`[DEBUG] listAllTables 시작 - 환경변수: EMBEDDING_DIMENSION=${process.env.EMBEDDING_DIMENSION}, QDRANT_URL=${process.env.QDRANT_URL}`);
 
     // 전체 테이블 검색
     const allResults = await this.schemaRAG!.searchRelevantSchemas('테이블', {
@@ -308,6 +311,8 @@ class EnhancedRAGServer {
       includeRelated: false,
       threshold: 0.0
     });
+
+    console.error(`[DEBUG] 검색 결과: ${allResults.length}개`);
 
     if (allResults.length === 0) {
       return this.createResponse('저장된 테이블 정보가 없습니다. 벡터 DB를 먼저 구축해주세요.');
@@ -372,8 +377,6 @@ class EnhancedRAGServer {
    */
   private async getTableRelationships(args: any) {
     const { tableName, depth = 2 } = args;
-
-    console.error(`[RAG] 테이블 관계 조회: ${tableName}, 깊이: ${depth}`);
 
     const searchResults = await this.schemaRAG!.searchRelevantSchemas(tableName, {
       topK: 1,
@@ -442,8 +445,6 @@ class EnhancedRAGServer {
    * 캐시 통계 정보를 조회합니다.
    */
   private async getCacheStats() {
-    console.error('[RAG] 캐시 통계 조회 중...');
-
     const stats = this.schemaRAG!.getCacheStats();
     
     let resultText = `📊 **시스템 캐시 통계:**\n\n`;
@@ -508,7 +509,7 @@ class EnhancedRAGServer {
   async run(): Promise<void> {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
-    console.error(`${this.config.name} v${this.config.version}가 시작되었습니다`);
+    //console.error(`${this.config.name} v${this.config.version}가 시작되었습니다`);
     
     // 정기적으로 캐시 정리
     setInterval(() => {
@@ -522,6 +523,6 @@ class EnhancedRAGServer {
 // 서버 시작
 const server = new EnhancedRAGServer();
 server.run().catch((error) => {
-  console.error('서버 시작 실패:', error);
+  //console.error('서버 시작 실패:', error);
   process.exit(1);
 });

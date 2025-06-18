@@ -34,16 +34,13 @@ export class SchemaRAG {
     
     try {
       const collectionInfo = await this.vectorClient.getCollection(collectionName);
-      console.log(`기존 컬렉션 '${collectionName}' 연결 완료`);
     } catch (error) {
-      console.log(`컬렉션 '${collectionName}' 생성 중...`);
       await this.vectorClient.createCollection(collectionName, {
         vectors: {
           size: 384, // all-MiniLM-L6-v2 임베딩 차원
           distance: 'Cosine'
         }
       });
-      console.log(`새 컬렉션 '${collectionName}' 생성 완료`);
     }
   }
 
@@ -102,7 +99,6 @@ export class SchemaRAG {
       throw new Error('Collection not initialized. Call initialize() first.');
     }
 
-    console.log('스키마 벡터 인덱싱 시작...');
     
     const points: any[] = [];
 
@@ -147,7 +143,6 @@ export class SchemaRAG {
     // 기존 데이터 삭제 후 새로 추가
     try {
       await this.vectorClient.deleteCollection(this.collectionName);
-      console.log('기존 컬렉션 삭제');
       
       await this.vectorClient.createCollection(this.collectionName, {
         vectors: {
@@ -155,9 +150,8 @@ export class SchemaRAG {
           distance: 'Cosine'
         }
       });
-      console.log('새 컬렉션 생성');
     } catch (error) {
-      console.log('컬렉션 재생성 중 오류 (무시 가능):', error);
+      // 컬렉션 재생성 중 오류 (무시 가능)
     }
 
     // 새 데이터 추가
@@ -166,7 +160,6 @@ export class SchemaRAG {
       points
     });
 
-    console.log(`${points.length}개 테이블 벡터 인덱싱 완료`);
   }
 
   /**
@@ -195,14 +188,13 @@ export class SchemaRAG {
     const cacheKey = JSON.stringify({ query: userQuery, options: opts });
     const cachedResult = this.getCachedSearchResults(cacheKey);
     if (cachedResult) {
-      console.log('캐시된 검색 결과 반환');
       return cachedResult;
     }
 
-    console.log(`스키마 검색 실행: "${userQuery}"`);
-
     // 쿼리 임베딩 생성
-    const queryEmbedding = await this.embeddingModel.embedDocuments([userQuery]);
+    console.error(`[DEBUG] 쿼리 임베딩 생성 시작: "${userQuery}"`);
+    const queryEmbedding = await this.embeddingModel.embedQuery(userQuery);
+    console.error(`[DEBUG] 임베딩 생성 완료: 차원=${queryEmbedding.length}, 첫 3개 값=[${queryEmbedding.slice(0, 3).join(', ')}]`);
 
     // 필터 구성
     const filter: any = {};
@@ -212,25 +204,37 @@ export class SchemaRAG {
     if (opts.tableNames && opts.tableNames.length > 0) {
       filter.table_name = { $in: opts.tableNames };
     }
+    console.error(`[DEBUG] 필터: ${JSON.stringify(filter)}`);
 
     // 벡터 검색 실행
+    console.error(`[DEBUG] 벡터 검색 시작 - topK=${opts.topK}, threshold=${opts.threshold}`);
     const searchResults = await this.vectorClient.search(this.collectionName, {
-      vector: queryEmbedding[0],
+      vector: queryEmbedding,
       limit: opts.topK,
       filter: Object.keys(filter).length > 0 ? filter : undefined,
       with_payload: true,
       with_vector: false
     });
+    console.error(`[DEBUG] 벡터 검색 완료: ${searchResults.length}개 결과`);
+    
+    if (searchResults.length > 0) {
+      console.error(`[DEBUG] 첫 번째 결과 점수: ${searchResults[0].score}, 임계값: ${opts.threshold}`);
+    }
 
     const results: SearchResult[] = [];
     
     for (const hit of searchResults) {
       const score = hit.score;
       const payload = hit.payload as any;
+      
+      console.error(`[DEBUG] 처리 중인 결과: table_name=${payload.table_name}, score=${score}`);
 
       if (score >= opts.threshold) {
-        // 캐시에서 테이블 정보 조회
-        const tableInfo = await this.getTableInfo(payload.table_name);
+        console.error(`[DEBUG] 임계값 통과, 캐시에서 테이블 정보 조회 시작`);
+        // 캐시에서 테이블 정보 조회 (없으면 payload에서 재구성)
+        const tableInfo = await this.getTableInfo(payload.table_name, payload);
+        console.error(`[DEBUG] 캐시 조회 결과: ${tableInfo ? '성공' : '실패'}`);
+        
         if (tableInfo) {
           const result: SearchResult = {
             table: tableInfo,
@@ -252,14 +256,18 @@ export class SchemaRAG {
           }
 
           results.push(result);
+          console.error(`[DEBUG] 결과 추가됨: ${tableInfo.tableName}`);
+        } else {
+          console.error(`[DEBUG] 테이블 정보 없음: ${payload.table_name}, 캐시 크기: ${this.cache.tables.size}`);
         }
+      } else {
+        console.error(`[DEBUG] 임계값 미달: ${score} < ${opts.threshold}`);
       }
     }
 
     // 결과 캐시
     this.cacheSearchResults(cacheKey, results);
 
-    console.log(`검색 완료: ${results.length}개 테이블 발견`);
     return results;
   }
 
@@ -277,15 +285,70 @@ export class SchemaRAG {
   }
 
   /**
-   * 캐시에서 테이블 정보를 조회합니다.
+   * 캐시에서 테이블 정보를 조회하고, 없으면 payload에서 재구성합니다.
    */
-  private async getTableInfo(tableName: string): Promise<TableInfo | null> {
+  private async getTableInfo(tableName: string, payload?: any): Promise<TableInfo | null> {
     const cacheEntry = this.cache.tables.get(tableName);
     if (cacheEntry && this.isCacheValid(cacheEntry)) {
       cacheEntry.hitCount++;
       return cacheEntry.data;
     }
+    
+    // 캐시에 없으면 payload에서 TableInfo 재구성
+    if (payload) {
+      console.error(`[DEBUG] 캐시에 없어서 payload에서 테이블 정보 재구성: ${tableName}`);
+      const tableInfo: TableInfo = {
+        tableName: payload.table_name,
+        schemaName: payload.schema_name || 'unknown',
+        description: payload.document?.split(' | ')[1]?.replace('설명: ', '') || 'No description',
+        businessDomain: payload.business_domain || 'general',
+        columns: this.parseColumnsFromDocument(payload.document || ''),
+        relationships: [],
+        commonQueries: [],
+        rowCount: parseInt(payload.row_count?.toString() || '0'),
+        indexedColumns: payload.indexed_columns || [],
+        engine: payload.engine || 'Unknown',
+        lastUpdated: new Date(),
+        sampleData: []
+      };
+      
+      // 캐시에 저장
+      this.cacheTableInfo(tableName, tableInfo);
+      return tableInfo;
+    }
+    
     return null;
+  }
+  
+  /**
+   * document 문자열에서 컬럼 정보를 파싱합니다.
+   */
+  private parseColumnsFromDocument(document: string): any[] {
+    const columns: any[] = [];
+    const parts = document.split(' | ');
+    const columnPart = parts.find(part => part.startsWith('컬럼: '));
+    
+    if (columnPart) {
+      const columnText = columnPart.replace('컬럼: ', '');
+      const columnStrs = columnText.split(', ');
+      
+      for (const colStr of columnStrs) {
+        const match = colStr.match(/^(\w+) \(([^)]+)\)(?:: (.+))?/);
+        if (match) {
+          columns.push({
+            name: match[1],
+            dataType: match[2],
+            description: match[3] || '',
+            isPrimaryKey: false,
+            isForeignKey: false,
+            isNullable: true,
+            foreignKeyReference: null
+          });
+        }
+      }
+    }
+    
+    return columns;
   }
 
   /**
@@ -347,7 +410,6 @@ export class SchemaRAG {
       }
     }
 
-    console.log('캐시 정리 완료');
   }
 
   /**

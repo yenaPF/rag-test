@@ -37,18 +37,18 @@ function loadConfig(): { embedding: EmbeddingConfig; vectorStore: VectorStoreCon
  * 벡터 DB 구축 메인 함수
  */
 async function buildVectorDb(): Promise<void> {
-  console.log('\n=== 고도화된 벡터 DB 구축 시작 ===');
+  //console.log('\n=== 고도화된 벡터 DB 구축 시작 ===');
   
   try {
     const config = loadConfig();
-    console.log('설정 로드 완료:', {
-      model: config.embedding.modelName,
-      collection: config.vectorStore.collectionName,
-      dimension: config.embedding.dimension
-    });
+    //console.log('설정 로드 완료:', {
+    //  model: config.embedding.modelName,
+    //  collection: config.vectorStore.collectionName,
+    //  dimension: config.embedding.dimension
+    //});
 
     // 1. 임베딩 모델 초기화 (Hugging Face 한국어 지원)
-    console.log('\n1. 임베딩 모델 초기화...');
+    //console.log('\n1. 임베딩 모델 초기화...');
     const embeddings = new HuggingFaceEmbeddings({
       modelName: config.embedding.modelName,
       dimension: config.embedding.dimension
@@ -57,55 +57,55 @@ async function buildVectorDb(): Promise<void> {
     // 모델 초기화
     await embeddings.initialize();
     const modelInfo = embeddings.getModelInfo();
-    console.log(`Hugging Face 한국어 임베딩 모델 로드 완료: ${modelInfo.modelName} (${modelInfo.dimension}D)`);
+    //console.log(`Hugging Face 한국어 임베딩 모델 로드 완료: ${modelInfo.modelName} (${modelInfo.dimension}D)`);
 
     // 2. Qdrant 클라이언트 초기화
-    console.log('\n2. Qdrant 클라이언트 초기화...');
+    //console.log('\n2. Qdrant 클라이언트 초기화...');
     const qdrantClient = new QdrantClient({
       url: config.vectorStore.url,
       apiKey: config.vectorStore.config?.apiKey
     });
-    console.log('Qdrant 클라이언트 초기화 완료');
+    //console.log('Qdrant 클라이언트 초기화 완료');
 
     // 3. SchemaRAG 인스턴스 생성 및 초기화
-    console.log('\n3. SchemaRAG 시스템 초기화...');
+    //console.log('\n3. SchemaRAG 시스템 초기화...');
     const schemaRAG = new SchemaRAG(qdrantClient, embeddings);
     await schemaRAG.initialize(config.vectorStore.collectionName);
-    console.log('SchemaRAG 시스템 초기화 완료');
+    //console.log('SchemaRAG 시스템 초기화 완료');
 
     // 4. 스키마 메타데이터 추출
-    console.log('\n4. 스키마 메타데이터 추출...');
+    //console.log('\n4. 스키마 메타데이터 추출...');
     const schemaMetadata = await extractSchemaMetadata();
-    console.log(`스키마 추출 완료: ${schemaMetadata.totalTables}개 테이블, ${schemaMetadata.totalRelationships}개 관계`);
+    //console.log(`스키마 추출 완료: ${schemaMetadata.totalTables}개 테이블, ${schemaMetadata.totalRelationships}개 관계`);
 
     // 5. 스키마 인덱싱
-    console.log('\n5. 스키마 벡터 인덱싱...');
+    //console.log('\n5. 스키마 벡터 인덱싱...');
     await schemaRAG.indexSchema(schemaMetadata);
-    console.log('스키마 인덱싱 완료');
+    //console.log('스키마 인덱싱 완료');
 
     // 6. 벡터 DB 무결성 테스트
-    console.log('\n6. 벡터 DB 무결성 테스트...');
+    //console.log('\n6. 벡터 DB 무결성 테스트...');
     await performIntegrityTests(schemaRAG);
 
     // 7. 성능 테스트
-    console.log('\n7. 성능 테스트...');
+    //console.log('\n7. 성능 테스트...');
     await performPerformanceTests(schemaRAG);
 
     // 8. 캐시 통계 출력
-    console.log('\n8. 캐시 통계:');
+    //console.log('\n8. 캐시 통계:');
     const cacheStats = schemaRAG.getCacheStats();
-    console.log(`- 테이블 캐시: ${cacheStats.tables.count}개 엔트리, ${cacheStats.tables.totalHits}회 히트`);
-    console.log(`- 관계 캐시: ${cacheStats.relationships.count}개 엔트리, ${cacheStats.relationships.totalHits}회 히트`);
-    console.log(`- 검색 결과 캐시: ${cacheStats.searchResults.count}개 엔트리, ${cacheStats.searchResults.totalHits}회 히트`);
+    //console.log(`- 테이블 캐시: ${cacheStats.tables.count}개 엔트리, ${cacheStats.tables.totalHits}회 히트`);
+    //console.log(`- 관계 캐시: ${cacheStats.relationships.count}개 엔트리, ${cacheStats.relationships.totalHits}회 히트`);
+    //console.log(`- 검색 결과 캐시: ${cacheStats.searchResults.count}개 엔트리, ${cacheStats.searchResults.totalHits}회 히트`);
 
-    console.log('\n✅ 고도화된 벡터 DB 구축 완료!');
+    //console.log('\n✅ 고도화된 벡터 DB 구축 완료!');
 
   } catch (error) {
-    console.error('❌ 벡터 DB 구축 중 오류 발생:', error);
+    //console.error('❌ 벡터 DB 구축 중 오류 발생:', error);
     throw error;
   } finally {
     await closeDbPool();
-    console.log('리소스 정리 완료');
+    //console.log('리소스 정리 완료');
   }
 }
 
@@ -121,7 +121,7 @@ async function performIntegrityTests(schemaRAG: SchemaRAG): Promise<void> {
   ];
 
   for (const query of testQueries) {
-    console.log(`\n테스트 쿼리: "${query}"`);
+    //console.log(`\n테스트 쿼리: "${query}"`);
     const startTime = Date.now();
     
     const results = await schemaRAG.searchRelevantSchemas(query, {
@@ -134,15 +134,15 @@ async function performIntegrityTests(schemaRAG: SchemaRAG): Promise<void> {
     const responseTime = endTime - startTime;
 
     if (results.length > 0) {
-      console.log(`✅ 검색 완료 (${responseTime}ms): ${results.length}개 결과`);
+      //console.log(`✅ 검색 완료 (${responseTime}ms): ${results.length}개 결과`);
       results.forEach((result, index) => {
-        console.log(`  ${index + 1}. ${result.table.tableName} (점수: ${result.score.toFixed(3)}, 도메인: ${result.table.businessDomain})`);
+        //console.log(`  ${index + 1}. ${result.table.tableName} (점수: ${result.score.toFixed(3)}, 도메인: ${result.table.businessDomain})`);
         if (result.relatedTables && result.relatedTables.length > 0) {
-          console.log(`     관련 테이블: ${result.relatedTables.map(t => t.tableName).join(', ')}`);
+          //console.log(`     관련 테이블: ${result.relatedTables.map(t => t.tableName).join(', ')}`);
         }
       });
     } else {
-      console.log('⚠️  검색 결과 없음');
+      //console.log('⚠️  검색 결과 없음');
     }
   }
 }
@@ -155,7 +155,7 @@ async function performPerformanceTests(schemaRAG: SchemaRAG): Promise<void> {
   const iterations = 5;
   const times: number[] = [];
 
-  console.log(`성능 테스트: "${testQuery}" (${iterations}회 실행)`);
+  //console.log(`성능 테스트: "${testQuery}" (${iterations}회 실행)`);
 
   for (let i = 0; i < iterations; i++) {
     const startTime = Date.now();
@@ -173,24 +173,24 @@ async function performPerformanceTests(schemaRAG: SchemaRAG): Promise<void> {
   const minTime = Math.min(...times);
   const maxTime = Math.max(...times);
 
-  console.log(`평균 응답 시간: ${avgTime.toFixed(2)}ms`);
-  console.log(`최소 응답 시간: ${minTime}ms`);
-  console.log(`최대 응답 시간: ${maxTime}ms`);
+  //console.log(`평균 응답 시간: ${avgTime.toFixed(2)}ms`);
+  //console.log(`최소 응답 시간: ${minTime}ms`);
+  //console.log(`최대 응답 시간: ${maxTime}ms`);
 
   // 캐시 효과 확인
-  console.log('\n캐시 효과 테스트...');
+  //console.log('\n캐시 효과 테스트...');
   const cacheTestStartTime = Date.now();
   await schemaRAG.searchRelevantSchemas(testQuery, { topK: 5 });
   const cacheTestEndTime = Date.now();
   
-  console.log(`캐시된 결과 응답 시간: ${cacheTestEndTime - cacheTestStartTime}ms`);
+  //console.log(`캐시된 결과 응답 시간: ${cacheTestEndTime - cacheTestStartTime}ms`);
 }
 
 /**
  * 관련 테이블 탐색 테스트
  */
 async function testRelatedTableDiscovery(schemaRAG: SchemaRAG): Promise<void> {
-  console.log('\n관련 테이블 자동 탐색 테스트...');
+  //console.log('\n관련 테이블 자동 탐색 테스트...');
   
   const searchResults = await schemaRAG.searchRelevantSchemas('사용자 테이블', {
     topK: 1,
@@ -199,15 +199,15 @@ async function testRelatedTableDiscovery(schemaRAG: SchemaRAG): Promise<void> {
 
   if (searchResults.length > 0) {
     const primaryTable = searchResults[0].table;
-    console.log(`주 테이블: ${primaryTable.tableName}`);
+    //console.log(`주 테이블: ${primaryTable.tableName}`);
     
     const relatedTables = await schemaRAG.findRelatedTables(primaryTable, 2);
-    console.log(`관련 테이블 (2단계 깊이): ${relatedTables.map(t => t.tableName).join(', ')}`);
+    //console.log(`관련 테이블 (2단계 깊이): ${relatedTables.map(t => t.tableName).join(', ')}`);
     
     // 관계 정보 출력
-    console.log('\n관계 정보:');
+    //console.log('\n관계 정보:');
     primaryTable.relationships.forEach(rel => {
-      console.log(`- ${rel.relationshipName}: ${rel.relatedTable} (${rel.relationshipType})`);
+      //console.log(`- ${rel.relationshipName}: ${rel.relatedTable} (${rel.relationshipType})`);
     });
   }
 }
@@ -216,11 +216,11 @@ async function testRelatedTableDiscovery(schemaRAG: SchemaRAG): Promise<void> {
 if (import.meta.url === `file://${process.argv[1]}`) {
   buildVectorDb()
     .then(() => {
-      console.log('\n🎉 모든 작업이 성공적으로 완료되었습니다!');
+      //console.log('\n🎉 모든 작업이 성공적으로 완료되었습니다!');
       process.exit(0);
     })
     .catch((error) => {
-      console.error('\n💥 작업 중 오류가 발생했습니다:', error);
+      //console.error('\n💥 작업 중 오류가 발생했습니다:', error);
       process.exit(1);
     });
 }

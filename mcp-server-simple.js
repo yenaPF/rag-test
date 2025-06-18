@@ -50,7 +50,7 @@ class SimpleRAGServer {
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
       
-      console.error(`[Simple RAG] 요청 받음: ${name}, 쿼리: ${args.query}`);
+      //console.error(`[Simple RAG] 요청 받음: ${name}, 쿼리: ${args.query}`);
 
       try {
         if (name === 'search_schema') {
@@ -65,7 +65,7 @@ class SimpleRAGServer {
           };
         }
       } catch (error) {
-        console.error(`[Simple RAG] 오류: ${error.message}`);
+        //console.error(`[Simple RAG] 오류: ${error.message}`);
         return {
           content: [
             {
@@ -81,12 +81,12 @@ class SimpleRAGServer {
   async run() {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
-    console.error('Simple RAG Vector Search MCP Server가 시작되었습니다');
+    //console.error('Simple RAG Vector Search MCP Server가 시작되었습니다');
   }
 }
 
 const server = new SimpleRAGServer();
 server.run().catch((error) => {
-  console.error('서버 시작 실패:', error);
+  //console.error('서버 시작 실패:', error);
   process.exit(1);
 });
