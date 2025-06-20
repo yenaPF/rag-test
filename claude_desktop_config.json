@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "enhanced-rag-vector-search": {
+      "command": "node",
+      "args": ["/Users/pyn/Documents/GitHub/rag-test/dist/mcp-server.js"],
+      "env": {
+        "QDRANT_URL": "http://localhost:6333",
+        "COLLECTION_NAME": "schema_documents",
+        "HF_MODEL": "jhgan/ko-sroberta-multitask",
+        "EMBEDDING_DIMENSION": "768",
+        "MCP_TIMEOUT": "60000"
+      }
+    }
+  }
+}
