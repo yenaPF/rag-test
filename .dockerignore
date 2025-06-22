@@ -1,0 +1,68 @@
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# TypeScript
+*.tsbuildinfo
+dist/
+
+# Environment files
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Logs
+logs/
+*.log
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Documentation
+README*.md
+*.md
+
+# Backup files
+*.backup
+*.bak
+
+# Temporary files
+tmp/
+temp/
+
+# Coverage reports
+coverage/
+
+# IntelliJ
+*.iml
+
+# Database files (if any)
+*.db
+*.sqlite
+
+# Vector database data (will be in containers)
+qdrant_data/
+
+# Build artifacts
+build/

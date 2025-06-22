@@ -1,0 +1,73 @@
+services:
+  # RAG Vector Search Service
+  rag-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rag-vector-search
+    environment:
+      # MySQL 연결 (외부)
+      - DB_HOST=${DB_HOST:-host.docker.internal}
+      - DB_PORT=${DB_PORT:-3306}
+      - DB_USER=${DB_USER:-root}
+      - DB_PASSWORD=${DB_PASSWORD:-password}
+      - DB_NAME=${DB_NAME:-test_db}
+      
+      # Qdrant 연결 (내부)
+      - QDRANT_URL=http://qdrant:6333
+      - QDRANT_API_KEY=${QDRANT_API_KEY:-}
+      - COLLECTION_NAME=${COLLECTION_NAME:-schema_documents}
+      
+      # HuggingFace 임베딩 모델
+      - HF_MODEL=${HF_MODEL:-jhgan/ko-sroberta-multitask}
+      - EMBEDDING_DIMENSION=${EMBEDDING_DIMENSION:-768}
+      - CHUNK_SIZE=${CHUNK_SIZE:-1000}
+      - CHUNK_OVERLAP=${CHUNK_OVERLAP:-200}
+      
+      # MCP 서버 설정
+      - MCP_TIMEOUT=${MCP_TIMEOUT:-30000}
+      - NODE_ENV=${NODE_ENV:-production}
+    volumes:
+      # 로그 및 임시 파일 저장
+      - ./logs:/app/logs
+      # 설정 파일 오버라이드 (선택사항)
+      - ./.env:/app/.env:ro
+    depends_on:
+      - qdrant
+    networks:
+      - rag-network
+    restart: unless-stopped
+    # 표준 입출력 사용 (MCP 프로토콜)
+    stdin_open: true
+    tty: true
+
+  # Qdrant Vector Database
+  qdrant:
+    image: qdrant/qdrant:v1.7.4
+    container_name: rag-qdrant
+    ports:
+      - "6333:6333"  # REST API
+      - "6334:6334"  # gRPC API
+    volumes:
+      # 데이터 영속성
+      - qdrant_data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__HTTP_PORT=6333
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    networks:
+      - rag-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:6333/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  rag-network:
+    driver: bridge
+
+volumes:
+  qdrant_data:
+    driver: local

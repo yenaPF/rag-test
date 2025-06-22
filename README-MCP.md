@@ -108,7 +108,7 @@ npm run mcp-server-ts
 - **Vector Database**: Qdrant
 - **Embedding Model**: Hugging Face (한국어 지원)
 - **MCP SDK**: @modelcontextprotocol/sdk
-- **Language**: TypeScript
+- **Language**: TypeScri
 - **Runtime**: Node.js
 
 ## 트러블슈팅
