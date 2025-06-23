@@ -1,19 +1,19 @@
 # RAG Vector Search Service Dockerfile
-FROM node:18-alpine
+FROM node:18-slim
 
 # 작업 디렉토리 설정
 WORKDIR /app
 
 # 시스템 의존성 설치
-RUN apk add --no-cache \
+RUN apt-get update && apt-get install -y \
     python3 \
-    make \
-    g++ \
-    && rm -rf /var/cache/apk/*
+    build-essential \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
 
 # 패키지 파일 복사 및 의존성 설치
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm ci
 
 # 소스 코드 복사
 COPY . .

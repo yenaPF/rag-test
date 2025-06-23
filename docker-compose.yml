@@ -14,7 +14,7 @@ services:
       - DB_NAME=${DB_NAME:-test_db}
       
       # Qdrant 연결 (내부)
-      - QDRANT_URL=http://qdrant:6333
+      - QDRANT_URL=${QDRANT_URL:-http://qdrant:6333}
       - QDRANT_API_KEY=${QDRANT_API_KEY:-}
       - COLLECTION_NAME=${COLLECTION_NAME:-schema_documents}
       
@@ -58,7 +58,7 @@ services:
       - rag-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:6333/"]
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:6333/collections"]
       interval: 30s
       timeout: 10s
       retries: 3

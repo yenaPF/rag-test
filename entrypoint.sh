@@ -63,7 +63,7 @@ timeout=60
 counter=0
 
 while [ $counter -lt $timeout ]; do
-    if wget -q --spider "${QDRANT_URL}/health" 2>/dev/null; then
+    if wget -q -O /dev/null "${QDRANT_URL}/collections" 2>/dev/null; then
         echo "✅ Qdrant 연결 성공!"
         break
     fi
