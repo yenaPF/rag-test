@@ -48,6 +48,7 @@ interface IndexRow extends RowDataPacket {
 
 /**
  * MySQL 데이터베이스에서 스키마 메타데이터를 추출합니다.
+ * 메타데이터 테이블에서 비즈니스 로직 정보도 함께 추출합니다.
  * @returns Promise<SchemaMetadata> 완전한 스키마 메타데이터 객체
  */
 export async function extractSchemaMetadata(): Promise<SchemaMetadata> {
@@ -221,19 +222,24 @@ export async function extractSchemaMetadata(): Promise<SchemaMetadata> {
       }
     }
 
-    // 5. 비즈니스 도메인 분류 (간단한 휴리스틱)
+    // 5. 메타데이터 테이블에서 비즈니스 정보 조회 및 병합
+    await enrichWithBusinessMetadata(connection, dbName, tables);
+
+    // 6. 기본 비즈니스 도메인 분류 (메타데이터가 없는 경우 폴백)
     for (const tableName in tables) {
       const table = tables[tableName];
-      if (tableName.includes('user') || tableName.includes('account')) {
-        table.businessDomain = 'user_management';
-      } else if (tableName.includes('order') || tableName.includes('purchase') || tableName.includes('payment')) {
-        table.businessDomain = 'commerce';
-      } else if (tableName.includes('product') || tableName.includes('item') || tableName.includes('inventory')) {
-        table.businessDomain = 'catalog';
-      } else if (tableName.includes('log') || tableName.includes('audit') || tableName.includes('event')) {
-        table.businessDomain = 'logging';
-      } else {
-        table.businessDomain = 'general';
+      if (!table.businessDomain || table.businessDomain === 'general') {
+        if (tableName.includes('user') || tableName.includes('account')) {
+          table.businessDomain = 'user_management';
+        } else if (tableName.includes('order') || tableName.includes('purchase') || tableName.includes('payment')) {
+          table.businessDomain = 'commerce';
+        } else if (tableName.includes('product') || tableName.includes('item') || tableName.includes('inventory')) {
+          table.businessDomain = 'catalog';
+        } else if (tableName.includes('log') || tableName.includes('audit') || tableName.includes('event')) {
+          table.businessDomain = 'logging';
+        } else {
+          table.businessDomain = 'general';
+        }
       }
     }
 
@@ -255,5 +261,137 @@ export async function extractSchemaMetadata(): Promise<SchemaMetadata> {
     if (connection) {
       connection.release();
     }
+  }
+}
+
+/**
+ * 메타데이터 테이블에서 비즈니스 정보를 조회하여 테이블 정보를 보강합니다.
+ */
+async function enrichWithBusinessMetadata(
+  connection: PoolConnection, 
+  dbName: string, 
+  tables: { [tableName: string]: TableInfo }
+): Promise<void> {
+  try {
+    // 1. 테이블 메타데이터 조회
+    const [metadataRows] = await connection.query<any[]>(`
+      SELECT 
+        tm.schema_name,
+        tm.table_name,
+        tm.business_domain,
+        tm.description as business_description,
+        tm.business_rules,
+        tm.status_reference_logic,
+        tm.unused_columns,
+        tm.primary_status_table
+      FROM table_metadata tm
+      WHERE tm.schema_name = ?
+    `, [dbName]);
+
+    const metadataMap = new Map();
+    for (const row of metadataRows) {
+      const key = `${row.schema_name}.${row.table_name}`;
+      metadataMap.set(key, row);
+    }
+
+    // 2. 컬럼 메타데이터 조회
+    const [columnMetadataRows] = await connection.query<any[]>(`
+      SELECT 
+        cm.schema_name,
+        cm.table_name,
+        cm.column_name,
+        cm.business_description,
+        cm.is_deprecated,
+        cm.deprecation_reason,
+        cm.replacement_column,
+        cm.usage_notes
+      FROM column_metadata cm
+      WHERE cm.schema_name = ?
+    `, [dbName]);
+
+    const columnMetadataMap = new Map();
+    for (const row of columnMetadataRows) {
+      const key = `${row.schema_name}.${row.table_name}.${row.column_name}`;
+      columnMetadataMap.set(key, row);
+    }
+
+    // 3. 테이블 정보에 메타데이터 병합
+    for (const [tableName, tableInfo] of Object.entries(tables)) {
+      const metadataKey = `${tableInfo.schemaName}.${tableInfo.tableName}`;
+      const metadata = metadataMap.get(metadataKey);
+      
+      if (metadata) {
+        // 비즈니스 도메인 정보 추가
+        if (metadata.business_domain) {
+          tableInfo.businessDomain = metadata.business_domain;
+        }
+        
+        // 기존 설명에 비즈니스 설명 추가
+        const descriptionParts = [tableInfo.description];
+        
+        if (metadata.business_description) {
+          descriptionParts.push(`비즈니스: ${metadata.business_description}`);
+        }
+        
+        if (metadata.business_rules) {
+          descriptionParts.push(`규칙: ${metadata.business_rules}`);
+        }
+        
+        if (metadata.status_reference_logic) {
+          descriptionParts.push(`상태참조: ${metadata.status_reference_logic}`);
+        }
+        
+        // 사용하지 않는 컬럼 정보 추가
+        if (metadata.unused_columns) {
+          try {
+            const unusedCols = JSON.parse(metadata.unused_columns);
+            if (Array.isArray(unusedCols) && unusedCols.length > 0) {
+              descriptionParts.push(`미사용컬럼: ${unusedCols.join(', ')}`);
+            }
+          } catch (e) {
+            // JSON 파싱 실패 시 무시
+          }
+        }
+        
+        if (metadata.primary_status_table) {
+          descriptionParts.push(`주요상태테이블: 이 테이블이 실제 상태 정보를 관리함`);
+        }
+        
+        tableInfo.description = descriptionParts.join(' | ');
+      }
+      
+      // 4. 컬럼별 메타데이터 추가
+      for (const column of tableInfo.columns) {
+        const columnKey = `${tableInfo.schemaName}.${tableInfo.tableName}.${column.name}`;
+        const columnMeta = columnMetadataMap.get(columnKey);
+        
+        if (columnMeta) {
+          const columnDescParts = [column.description || ''];
+          
+          if (columnMeta.business_description) {
+            columnDescParts.push(columnMeta.business_description);
+          }
+          
+          if (columnMeta.is_deprecated) {
+            columnDescParts.push(`[DEPRECATED: ${columnMeta.deprecation_reason || '사용 중단됨'}]`);
+            if (columnMeta.replacement_column) {
+              columnDescParts.push(`대신 ${columnMeta.replacement_column} 사용`);
+            }
+          }
+          
+          if (columnMeta.usage_notes) {
+            columnDescParts.push(`참고: ${columnMeta.usage_notes}`);
+          }
+          
+          column.description = columnDescParts.filter(part => part.trim()).join(' ');
+        }
+      }
+    }
+
+    console.log(`비즈니스 메타데이터 병합 완료: 테이블 ${metadataRows.length}개, 컬럼 ${columnMetadataRows.length}개`);
+    
+  } catch (error) {
+    // 메타데이터 테이블이 없거나 오류가 발생해도 기본 스키마 추출은 계속 진행
+    console.warn('비즈니스 메타데이터 조회 중 오류 (무시하고 계속 진행):', error);
   }
 }
