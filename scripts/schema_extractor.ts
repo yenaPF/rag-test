@@ -81,7 +81,15 @@ export async function extractSchemaMetadata(): Promise<SchemaMetadata> {
       ORDER BY TABLE_NAME;
     `, [dbName]);
 
+    // 메타데이터 테이블들 제외 (이들은 다른 테이블 정보를 풍부하게 하는 데만 사용)
+    const excludedTables = ['table_metadata', 'column_metadata', 'table_business_relationships'];
+    
     for (const row of tablesRes) {
+      // 메타데이터 테이블들은 벡터 DB에 저장하지 않음
+      if (excludedTables.includes(row.TABLE_NAME)) {
+        continue;
+      }
+      
       tables[row.TABLE_NAME] = {
         tableName: row.TABLE_NAME,
         schemaName: dbName,

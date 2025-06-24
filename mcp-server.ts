@@ -256,11 +256,46 @@ class EnhancedRAGServer {
       resultText += `📂 도메인: ${table.businessDomain}\n`;
       resultText += `📊 행 수: ${table.rowCount.toLocaleString()}\n`;
       resultText += `🔧 엔진: ${table.engine || 'Unknown'}\n`;
-      resultText += `📝 설명: ${table.description}\n\n`;
+      // 벡터 DB의 원본 document에서 메타데이터 파싱해서 표시
+      const fullDocument = result.matchedContent || table.description;
+      const descParts = fullDocument.split(' | ');
+      resultText += `📝 **상세 정보:**\n`;
       
-      // 컬럼 정보
+      // 설명 부분만 추출 (테이블명과 컬럼 정보 제외)
+      let basicDesc = '';
+      let businessInfo = '';
+      let rules = '';
+      let statusRef = '';
+      let unusedCols = '';
+      let primaryStatus = '';
+      
+      descParts.forEach(part => {
+        if (part.startsWith('설명:')) {
+          basicDesc = part.replace('설명:', '').trim();
+        } else if (part.startsWith('비즈니스:')) {
+          businessInfo = part.replace('비즈니스:', '').trim();
+        } else if (part.startsWith('규칙:')) {
+          rules = part.replace('규칙:', '').trim();
+        } else if (part.startsWith('상태참조:')) {
+          statusRef = part.replace('상태참조:', '').trim();
+        } else if (part.startsWith('미사용컬럼:')) {
+          unusedCols = part.replace('미사용컬럼:', '').trim();
+        } else if (part.startsWith('주요상태테이블:')) {
+          primaryStatus = part.replace('주요상태테이블:', '').trim();
+        }
+      });
+      
+      if (basicDesc) resultText += `   📖 ${basicDesc}\n`;
+      if (businessInfo) resultText += `💼 비즈니스: ${businessInfo}\n`;
+      if (rules) resultText += `📋 규칙: ${rules}\n`;
+      if (statusRef) resultText += `🔗 상태참조: ${statusRef}\n`;
+      if (unusedCols) resultText += `❌ 미사용컬럼: ${unusedCols}\n`;
+      if (primaryStatus) resultText += `⭐ ${primaryStatus}\n`;
+      resultText += `\n`;
+      
+      // 컬럼 정보 (모든 컬럼 표시)
       resultText += `**컬럼 정보 (${table.columns.length}개):**\n`;
-      table.columns.slice(0, 10).forEach(col => {
+      table.columns.forEach(col => {
         let colInfo = `- ${col.name} (${col.dataType})`;
         if (col.isPrimaryKey) colInfo += ' [PK]';
         if (col.isForeignKey) colInfo += ` [FK → ${col.foreignKeyReference}]`;
@@ -268,10 +303,6 @@ class EnhancedRAGServer {
         colInfo += `: ${col.description}`;
         resultText += colInfo + '\n';
       });
-      
-      if (table.columns.length > 10) {
-        resultText += `... 및 ${table.columns.length - 10}개 추가 컬럼\n`;
-      }
 
       // 관계 정보
       if (table.relationships.length > 0) {

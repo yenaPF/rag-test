@@ -47,12 +47,12 @@ async function queryVectorDb(query: string, k: number = 3): Promise<void> {
         });
 
         if (searchResults.length === 0) {
-            //console.log('검색 결과가 없습니다.');
+            console.log('검색 결과가 없습니다.');
             return;
         }
 
-        //console.log(`\n검색 결과 (상위 ${searchResults.length}개):`);
-        //console.log('='.repeat(50));
+        console.log(`\n검색 결과 (상위 ${searchResults.length}개):`);
+        console.log('='.repeat(50));
 
         searchResults.forEach((result, index) => {
             const payload = result.payload as any;
@@ -60,19 +60,19 @@ async function queryVectorDb(query: string, k: number = 3): Promise<void> {
             const tableName = payload.table_name || 'Unknown';
             const document = payload.document || '';
 
-            //console.log(`\n${index + 1}. 테이블: ${tableName} (유사도: ${score.toFixed(4)})`);
-            //console.log('-'.repeat(30));
-            //console.log(document);
+            console.log(`\n${index + 1}. 테이블: ${tableName} (유사도: ${score.toFixed(4)})`);
+            console.log('-'.repeat(30));
+            console.log(document);
             
             // 추가 메타데이터 표시 (있는 경우)
             if (payload.business_domain) {
-                //console.log(`도메인: ${payload.business_domain}`);
+                console.log(`도메인: ${payload.business_domain}`);
             }
             if (payload.column_names && Array.isArray(payload.column_names)) {
-                //console.log(`컬럼: ${payload.column_names.join(', ')}`);
+                console.log(`컬럼: ${payload.column_names.join(', ')}`);
             }
             if (payload.row_count) {
-                //console.log(`행 수: ${payload.row_count}`);
+                console.log(`행 수: ${payload.row_count}`);
             }
         });
 
