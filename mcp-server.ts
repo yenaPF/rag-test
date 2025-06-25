@@ -244,24 +244,28 @@ class EnhancedRAGServer {
     const responseTime = endTime - startTime;
 
     if (results.length === 0) {
-      return this.createResponse(`"${query}"에 대한 검색 결과가 없습니다. 검색 조건을 조정해보세요.`);
+      return this.createResponse(`SEARCH_RESULTS:\nQUERY: ${query}\nSTATUS: NO_RESULTS\nMESSAGE: 검색 조건을 조정해보세요.`);
     }
 
-    // 검색 결과 포맷팅
-    let resultText = `🔍 "${query}" 고도화된 검색 결과 (${results.length}개, ${responseTime}ms):\n\n`;
+    // LLM 친화적 구조화된 포맷으로 변경
+    let resultText = `SEARCH_RESULTS:\n`;
+    resultText += `QUERY: ${query}\n`;
+    resultText += `RESPONSE_TIME_MS: ${responseTime}\n`;
+    resultText += `TOTAL_RESULTS: ${results.length}\n\n`;
     
     results.forEach((result, index) => {
       const table = result.table;
-      resultText += `**${index + 1}. 테이블: ${table.tableName}** (점수: ${result.score.toFixed(3)})\n`;
-      resultText += `📂 도메인: ${table.businessDomain}\n`;
-      resultText += `📊 행 수: ${table.rowCount.toLocaleString()}\n`;
-      resultText += `🔧 엔진: ${table.engine || 'Unknown'}\n`;
-      // 벡터 DB의 원본 document에서 메타데이터 파싱해서 표시
+      
+      resultText += `TABLE_${index + 1}:\n`;
+      resultText += `NAME: ${table.tableName}\n`;
+      resultText += `SIMILARITY_SCORE: ${result.score.toFixed(3)}\n`;
+      resultText += `BUSINESS_DOMAIN: ${table.businessDomain}\n`;
+      resultText += `ROW_COUNT: ${table.rowCount}\n`;
+      resultText += `ENGINE: ${table.engine || 'Unknown'}\n`;
+      
+      // 메타데이터 파싱
       const fullDocument = result.matchedContent || table.description;
       const descParts = fullDocument.split(' | ');
-      resultText += `📝 **상세 정보:**\n`;
-      
-      // 설명 부분만 추출 (테이블명과 컬럼 정보 제외)
       let basicDesc = '';
       let businessInfo = '';
       let rules = '';
@@ -285,44 +289,53 @@ class EnhancedRAGServer {
         }
       });
       
-      if (basicDesc) resultText += `   📖 ${basicDesc}\n`;
-      if (businessInfo) resultText += `💼 비즈니스: ${businessInfo}\n`;
-      if (rules) resultText += `📋 규칙: ${rules}\n`;
-      if (statusRef) resultText += `🔗 상태참조: ${statusRef}\n`;
-      if (unusedCols) resultText += `❌ 미사용컬럼: ${unusedCols}\n`;
-      if (primaryStatus) resultText += `⭐ ${primaryStatus}\n`;
-      resultText += `\n`;
+      if (basicDesc) resultText += `DESCRIPTION: ${basicDesc}\n`;
+      if (businessInfo) resultText += `BUSINESS_PURPOSE: ${businessInfo}\n`;
+      if (rules) resultText += `BUSINESS_RULES: ${rules}\n`;
+      if (statusRef) resultText += `STATUS_REFERENCE: ${statusRef}\n`;
+      if (unusedCols) resultText += `UNUSED_COLUMNS: ${unusedCols}\n`;
+      if (primaryStatus) resultText += `PRIMARY_STATUS_TABLE: ${primaryStatus}\n`;
       
-      // 컬럼 정보 (모든 컬럼 표시)
-      resultText += `**컬럼 정보 (${table.columns.length}개):**\n`;
+      // 컬럼 정보 구조화
+      resultText += `COLUMNS:\n`;
       table.columns.forEach(col => {
-        let colInfo = `- ${col.name} (${col.dataType})`;
-        if (col.isPrimaryKey) colInfo += ' [PK]';
-        if (col.isForeignKey) colInfo += ` [FK → ${col.foreignKeyReference}]`;
-        if (!col.isNullable) colInfo += ' [NOT NULL]';
-        colInfo += `: ${col.description}`;
-        resultText += colInfo + '\n';
+        resultText += `- NAME: ${col.name}\n`;
+        resultText += `  DATA_TYPE: ${col.dataType}\n`;
+        resultText += `  IS_PRIMARY_KEY: ${col.isPrimaryKey}\n`;
+        resultText += `  IS_FOREIGN_KEY: ${col.isForeignKey}\n`;
+        if (col.isForeignKey && col.foreignKeyReference) {
+          resultText += `  FK_REFERENCE: ${col.foreignKeyReference}\n`;
+        }
+        resultText += `  IS_NULLABLE: ${col.isNullable}\n`;
+        resultText += `  DESCRIPTION: ${col.description}\n`;
       });
 
-      // 관계 정보
+      // 관계 정보 구조화
       if (table.relationships.length > 0) {
-        resultText += `\n**관계 정보 (${table.relationships.length}개):**\n`;
+        resultText += `RELATIONSHIPS:\n`;
         table.relationships.forEach(rel => {
-          resultText += `- ${rel.relationshipName}: ${rel.relatedTable} (${rel.relationshipType})\n`;
+          resultText += `- NAME: ${rel.relationshipName}\n`;
+          resultText += `  RELATED_TABLE: ${rel.relatedTable}\n`;
+          resultText += `  TYPE: ${rel.relationshipType}\n`;
+          resultText += `  LOCAL_COLUMN: ${rel.localColumn}\n`;
+          resultText += `  FOREIGN_COLUMN: ${rel.foreignColumn}\n`;
+          resultText += `  IS_OWNER: ${rel.isOwner}\n`;
         });
       }
 
       // 관련 테이블
       if (result.relatedTables && result.relatedTables.length > 0) {
-        resultText += `\n**관련 테이블:** ${result.relatedTables.map(t => t.tableName).join(', ')}\n`;
+        resultText += `RELATED_TABLES: ${result.relatedTables.map(t => t.tableName).join(', ')}\n`;
       }
 
       // 인덱스 정보
       if (table.indexedColumns.length > 0) {
-        resultText += `\n**인덱스된 컬럼:** ${table.indexedColumns.join(', ')}\n`;
+        resultText += `INDEXED_COLUMNS: ${table.indexedColumns.join(', ')}\n`;
       }
 
-      resultText += `\n${'='.repeat(80)}\n\n`;
+      if (index < results.length - 1) {
+        resultText += `\n---\n\n`;
+      }
     });
 
     return this.createResponse(resultText);
@@ -346,10 +359,13 @@ class EnhancedRAGServer {
     console.error(`[DEBUG] 검색 결과: ${allResults.length}개`);
 
     if (allResults.length === 0) {
-      return this.createResponse('저장된 테이블 정보가 없습니다. 벡터 DB를 먼저 구축해주세요.');
+      return this.createResponse('TABLE_LIST:\nSTATUS: NO_TABLES\nMESSAGE: 저장된 테이블 정보가 없습니다. 벡터 DB를 먼저 구축해주세요.');
     }
 
-    let resultText = `📊 데이터베이스 테이블 목록 (총 ${allResults.length}개):\n\n`;
+    let resultText = `TABLE_LIST:\n`;
+    resultText += `TOTAL_TABLES: ${allResults.length}\n`;
+    resultText += `GROUP_BY_DOMAIN: ${groupByDomain}\n`;
+    resultText += `INCLUDE_STATS: ${includeStats}\n\n`;
 
     if (groupByDomain) {
       // 도메인별 그룹화
@@ -362,27 +378,37 @@ class EnhancedRAGServer {
         domainGroups[domain].push(result);
       });
 
-      for (const [domain, tables] of Object.entries(domainGroups)) {
-        resultText += `**📁 ${domain.toUpperCase()} (${tables.length}개 테이블):**\n`;
-        tables.forEach((result, index) => {
+      Object.entries(domainGroups).forEach(([domain, tables], domainIndex) => {
+        resultText += `DOMAIN_${domainIndex + 1}:\n`;
+        resultText += `NAME: ${domain}\n`;
+        resultText += `TABLE_COUNT: ${tables.length}\n`;
+        resultText += `TABLES:\n`;
+        
+        tables.forEach((result, tableIndex) => {
           const table = result.table;
-          resultText += `  ${index + 1}. ${table.tableName}`;
+          resultText += `- TABLE_${tableIndex + 1}:\n`;
+          resultText += `  NAME: ${table.tableName}\n`;
           if (includeStats) {
-            resultText += ` (${table.rowCount.toLocaleString()}행, ${table.columns.length}컬럼)`;
+            resultText += `  ROW_COUNT: ${table.rowCount}\n`;
+            resultText += `  COLUMN_COUNT: ${table.columns.length}\n`;
           }
-          resultText += `\n     └ ${table.description}\n`;
+          resultText += `  DESCRIPTION: ${table.description}\n`;
         });
         resultText += '\n';
-      }
+      });
     } else {
       // 단순 목록
+      resultText += `TABLES:\n`;
       allResults.forEach((result, index) => {
         const table = result.table;
-        resultText += `${index + 1}. **${table.tableName}**`;
+        resultText += `- TABLE_${index + 1}:\n`;
+        resultText += `  NAME: ${table.tableName}\n`;
+        resultText += `  BUSINESS_DOMAIN: ${table.businessDomain}\n`;
         if (includeStats) {
-          resultText += ` (${table.businessDomain}, ${table.rowCount.toLocaleString()}행)`;
+          resultText += `  ROW_COUNT: ${table.rowCount}\n`;
+          resultText += `  COLUMN_COUNT: ${table.columns.length}\n`;
         }
-        resultText += `\n   ${table.description}\n`;
+        resultText += `  DESCRIPTION: ${table.description}\n`;
       });
     }
 
@@ -392,13 +418,11 @@ class EnhancedRAGServer {
       const totalColumns = allResults.reduce((sum, result) => sum + result.table.columns.length, 0);
       const totalRelationships = allResults.reduce((sum, result) => sum + result.table.relationships.length, 0);
 
-      resultText += `\n📈 **데이터베이스 통계:**\n`;
-      resultText += `- 총 행 수: ${totalRows.toLocaleString()}\n`;
-      resultText += `- 총 컬럼 수: ${totalColumns.toLocaleString()}\n`;
-      resultText += `- 총 관계 수: ${totalRelationships}\n`;
+      resultText += `\nDATABASE_STATISTICS:\n`;
+      resultText += `TOTAL_ROWS: ${totalRows}\n`;
+      resultText += `TOTAL_COLUMNS: ${totalColumns}\n`;
+      resultText += `TOTAL_RELATIONSHIPS: ${totalRelationships}\n`;
     }
-
-    resultText += `\n💡 특정 테이블의 상세 정보를 보려면 'search_schema' 도구를 사용하세요.\n`;
 
     return this.createResponse(resultText);
   }
@@ -416,41 +440,60 @@ class EnhancedRAGServer {
     });
 
     if (searchResults.length === 0) {
-      return this.createResponse(`테이블 "${tableName}"을 찾을 수 없습니다.`);
+      return this.createResponse(`TABLE_RELATIONSHIPS:\nTABLE_NAME: ${tableName}\nSTATUS: NOT_FOUND\nMESSAGE: 테이블을 찾을 수 없습니다.`);
     }
 
     const table = searchResults[0].table;
     const relatedTables = await this.schemaRAG!.findRelatedTables(table, depth);
 
-    let resultText = `🔗 **${table.tableName}** 테이블 관계 정보:\n\n`;
+    let resultText = `TABLE_RELATIONSHIPS:\n`;
+    resultText += `TABLE_NAME: ${table.tableName}\n`;
+    resultText += `DEPTH: ${depth}\n`;
+    resultText += `BUSINESS_DOMAIN: ${table.businessDomain}\n`;
+    resultText += `ROW_COUNT: ${table.rowCount}\n`;
+    resultText += `COLUMN_COUNT: ${table.columns.length}\n\n`;
     
     // 직접 관계
     if (table.relationships.length > 0) {
-      resultText += `**직접 관계 (${table.relationships.length}개):**\n`;
-      table.relationships.forEach(rel => {
-        resultText += `- **${rel.relationshipName}**\n`;
-        resultText += `  └ ${rel.relatedTable} (${rel.relationshipType})\n`;
-        resultText += `  └ ${rel.localColumn} → ${rel.foreignColumn}\n`;
-        resultText += `  └ 소유자: ${rel.isOwner ? 'Yes' : 'No'}\n\n`;
+      resultText += `DIRECT_RELATIONSHIPS:\n`;
+      resultText += `COUNT: ${table.relationships.length}\n`;
+      table.relationships.forEach((rel, index) => {
+        resultText += `- RELATIONSHIP_${index + 1}:\n`;
+        resultText += `  NAME: ${rel.relationshipName}\n`;
+        resultText += `  RELATED_TABLE: ${rel.relatedTable}\n`;
+        resultText += `  TYPE: ${rel.relationshipType}\n`;
+        resultText += `  LOCAL_COLUMN: ${rel.localColumn}\n`;
+        resultText += `  FOREIGN_COLUMN: ${rel.foreignColumn}\n`;
+        resultText += `  IS_OWNER: ${rel.isOwner}\n`;
       });
+      resultText += '\n';
     }
 
     // 관련 테이블 (깊이 탐색)
     if (relatedTables.length > 0) {
-      resultText += `**관련 테이블 (${depth}단계 깊이, ${relatedTables.length}개):**\n`;
+      resultText += `RELATED_TABLES:\n`;
+      resultText += `COUNT: ${relatedTables.length}\n`;
+      resultText += `SEARCH_DEPTH: ${depth}\n`;
       relatedTables.forEach((relTable, index) => {
-        resultText += `${index + 1}. **${relTable.tableName}** (${relTable.businessDomain})\n`;
-        resultText += `   └ ${relTable.description}\n`;
-        resultText += `   └ ${relTable.rowCount.toLocaleString()}행, ${relTable.columns.length}컬럼\n\n`;
+        resultText += `- TABLE_${index + 1}:\n`;
+        resultText += `  NAME: ${relTable.tableName}\n`;
+        resultText += `  BUSINESS_DOMAIN: ${relTable.businessDomain}\n`;
+        resultText += `  DESCRIPTION: ${relTable.description}\n`;
+        resultText += `  ROW_COUNT: ${relTable.rowCount}\n`;
+        resultText += `  COLUMN_COUNT: ${relTable.columns.length}\n`;
       });
+      resultText += '\n';
     }
 
     // 외래키 분석
     const foreignKeys = table.columns.filter(col => col.isForeignKey);
     if (foreignKeys.length > 0) {
-      resultText += `**외래키 컬럼 (${foreignKeys.length}개):**\n`;
-      foreignKeys.forEach(fk => {
-        resultText += `- ${fk.name} → ${fk.foreignKeyReference}\n`;
+      resultText += `FOREIGN_KEYS:\n`;
+      resultText += `COUNT: ${foreignKeys.length}\n`;
+      foreignKeys.forEach((fk, index) => {
+        resultText += `- FK_${index + 1}:\n`;
+        resultText += `  COLUMN_NAME: ${fk.name}\n`;
+        resultText += `  REFERENCES: ${fk.foreignKeyReference}\n`;
       });
       resultText += '\n';
     }
@@ -460,11 +503,16 @@ class EnhancedRAGServer {
       rt.relationships.some(rel => rel.relatedTable === table.tableName)
     );
     if (referencingTables.length > 0) {
-      resultText += `**이 테이블을 참조하는 테이블 (${referencingTables.length}개):**\n`;
-      referencingTables.forEach(rt => {
+      resultText += `REFERENCING_TABLES:\n`;
+      resultText += `COUNT: ${referencingTables.length}\n`;
+      referencingTables.forEach((rt, rtIndex) => {
         const refs = rt.relationships.filter(rel => rel.relatedTable === table.tableName);
-        refs.forEach(ref => {
-          resultText += `- ${rt.tableName}.${ref.localColumn} → ${table.tableName}.${ref.foreignColumn}\n`;
+        refs.forEach((ref, refIndex) => {
+          resultText += `- REFERENCE_${rtIndex + 1}_${refIndex + 1}:\n`;
+          resultText += `  FROM_TABLE: ${rt.tableName}\n`;
+          resultText += `  FROM_COLUMN: ${ref.localColumn}\n`;
+          resultText += `  TO_TABLE: ${table.tableName}\n`;
+          resultText += `  TO_COLUMN: ${ref.foreignColumn}\n`;
         });
       });
     }
@@ -478,29 +526,32 @@ class EnhancedRAGServer {
   private async getCacheStats() {
     const stats = this.schemaRAG!.getCacheStats();
     
-    let resultText = `📊 **시스템 캐시 통계:**\n\n`;
-    
-    resultText += `**테이블 캐시:**\n`;
-    resultText += `- 저장된 엔트리: ${stats.tables.count}개\n`;
-    resultText += `- 총 히트 수: ${stats.tables.totalHits}회\n\n`;
-    
-    resultText += `**관계 캐시:**\n`;
-    resultText += `- 저장된 엔트리: ${stats.relationships.count}개\n`;
-    resultText += `- 총 히트 수: ${stats.relationships.totalHits}회\n\n`;
-    
-    resultText += `**검색 결과 캐시:**\n`;
-    resultText += `- 저장된 엔트리: ${stats.searchResults.count}개\n`;
-    resultText += `- 총 히트 수: ${stats.searchResults.totalHits}회\n\n`;
-
     const totalEntries = stats.tables.count + stats.relationships.count + stats.searchResults.count;
     const totalHits = stats.tables.totalHits + stats.relationships.totalHits + stats.searchResults.totalHits;
     
-    resultText += `**전체 통계:**\n`;
-    resultText += `- 총 캐시 엔트리: ${totalEntries}개\n`;
-    resultText += `- 총 캐시 히트: ${totalHits}회\n`;
-    resultText += `- 평균 히트율: ${totalEntries > 0 ? (totalHits / totalEntries).toFixed(2) : '0.00'}회/엔트리\n\n`;
-
-    resultText += `💡 캐시 정리를 위해서는 서버를 재시작하세요.`;
+    let resultText = `CACHE_STATISTICS:\n`;
+    
+    resultText += `TABLE_CACHE:\n`;
+    resultText += `ENTRIES: ${stats.tables.count}\n`;
+    resultText += `TOTAL_HITS: ${stats.tables.totalHits}\n`;
+    resultText += `AVERAGE_HITS_PER_ENTRY: ${stats.tables.count > 0 ? (stats.tables.totalHits / stats.tables.count).toFixed(2) : '0.00'}\n\n`;
+    
+    resultText += `RELATIONSHIP_CACHE:\n`;
+    resultText += `ENTRIES: ${stats.relationships.count}\n`;
+    resultText += `TOTAL_HITS: ${stats.relationships.totalHits}\n`;
+    resultText += `AVERAGE_HITS_PER_ENTRY: ${stats.relationships.count > 0 ? (stats.relationships.totalHits / stats.relationships.count).toFixed(2) : '0.00'}\n\n`;
+    
+    resultText += `SEARCH_RESULTS_CACHE:\n`;
+    resultText += `ENTRIES: ${stats.searchResults.count}\n`;
+    resultText += `TOTAL_HITS: ${stats.searchResults.totalHits}\n`;
+    resultText += `AVERAGE_HITS_PER_ENTRY: ${stats.searchResults.count > 0 ? (stats.searchResults.totalHits / stats.searchResults.count).toFixed(2) : '0.00'}\n\n`;
+    
+    resultText += `OVERALL_STATISTICS:\n`;
+    resultText += `TOTAL_CACHE_ENTRIES: ${totalEntries}\n`;
+    resultText += `TOTAL_CACHE_HITS: ${totalHits}\n`;
+    resultText += `OVERALL_AVERAGE_HITS_PER_ENTRY: ${totalEntries > 0 ? (totalHits / totalEntries).toFixed(2) : '0.00'}\n`;
+    resultText += `CACHE_TTL_MINUTES: 5\n`;
+    resultText += `CLEANUP_INTERVAL_MINUTES: 5\n`;
 
     return this.createResponse(resultText);
   }
